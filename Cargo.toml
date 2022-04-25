@@ -1,0 +1,29 @@
+[package]
+name = "sqlite-ll"
+version = "0.1.0"
+license = "Apache-2.0/MIT"
+edition = "2021"
+authors = [
+    "John-John Tedro <udoprog@tedro.se>"
+]
+description = "Low-level interface to the SQLite database"
+documentation = "https://docs.rs/sqlite-ll"
+homepage = "https://github.com/udoprog/sqlite-ll"
+repository = "https://github.com/udoprog/sqlite-ll"
+readme = "README.md"
+categories = ["api-bindings", "database"]
+keywords = ["database"]
+
+[features]
+default = ["linkage"]
+linkage = ["sqlite3-sys/linkage"]
+
+[dependencies]
+libc = "0.2.124"
+
+[dependencies.sqlite3-sys]
+version = "0.13.0"
+default-features = false
+
+[dev-dependencies]
+temporary = "0.6.4"
