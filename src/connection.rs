@@ -183,7 +183,7 @@ impl Drop for Connection {
 }
 
 /// Options that can be used to customize the opening of a SQLite database.
-#[derive(Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct OpenOptions {
     raw: c_int,
 }
@@ -192,7 +192,7 @@ impl OpenOptions {
     /// Create flags for opening a database connection.
     #[inline]
     pub fn new() -> Self {
-        OpenOptions { raw: 0 }
+        Self::default()
     }
 
     /// Open a database connection with current flags.

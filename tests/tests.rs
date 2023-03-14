@@ -84,7 +84,7 @@ fn connection_set_busy_handler() -> Result<(), Box<dyn std::error::Error>> {
         .map(|_| {
             let path = path.to_path_buf();
             thread::spawn(move || {
-                let mut connection = Connection::open(&path)?;
+                let mut connection = Connection::open(path)?;
                 connection.set_busy_handler(|_| true)?;
                 let statement = "INSERT INTO users VALUES (?, ?, ?, ?, ?)";
                 let mut statement = connection.prepare(statement)?;
@@ -213,13 +213,13 @@ fn statement_parameter_index() -> sqlite_ll::Result<()> {
     let mut statement = connection.prepare(statement)?;
 
     statement.bind(statement.parameter_index(":id")?.unwrap(), 2)?;
-    statement.bind(statement.parameter_index(":name")?.unwrap().into(), "Bob")?;
-    statement.bind(statement.parameter_index(":age")?.unwrap().into(), 69.42)?;
+    statement.bind(statement.parameter_index(":name")?.unwrap(), "Bob")?;
+    statement.bind(statement.parameter_index(":age")?.unwrap(), 69.42)?;
     statement.bind(
-        statement.parameter_index(":photo")?.unwrap().into(),
+        statement.parameter_index(":photo")?.unwrap(),
         &[0x69u8, 0x42u8][..],
     )?;
-    statement.bind(statement.parameter_index(":email")?.unwrap().into(), ())?;
+    statement.bind(statement.parameter_index(":email")?.unwrap(), ())?;
     assert_eq!(statement.parameter_index(":missing")?, None);
     assert_eq!(statement.step()?, State::Done);
     Ok(())

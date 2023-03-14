@@ -2,49 +2,40 @@
   
 name: CI
 
-on: [push, pull_request]
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        profile: minimal
-    - run: cargo build --all --tests --examples
-
-  build_benches:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        profile: minimal
-    - run: cargo build --all --benches
-
   test:
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        rust: ["1.60", stable]
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{matrix.rust}}
+    - run: cargo test --workspace --all-targets
+    - run: cargo test --workspace --doc
+
+  clippy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@1.68
       with:
-        toolchain: stable
-        override: true
-        profile: minimal
-    - run: cargo test --all
+        components: clippy
+    - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        components: rustfmt
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
     - run: cargo fmt --check

@@ -98,7 +98,7 @@ impl Statement {
             self.bind(i, value)?;
             Ok(())
         } else {
-            return Err(Error::from_code(ffi::SQLITE_MISMATCH));
+            Err(Error::from_code(ffi::SQLITE_MISMATCH))
         }
     }
 
@@ -123,7 +123,7 @@ impl Statement {
                 return Err(Error::from_code(code));
             }
 
-            Ok(utils::cstr_to_str(pointer)?)
+            utils::cstr_to_str(pointer)
         }
     }
 
@@ -361,14 +361,14 @@ impl Readable for Value {
 impl Readable for f64 {
     #[inline]
     fn read(statement: &Statement, i: usize) -> Result<Self> {
-        Ok(unsafe { ffi::sqlite3_column_double(statement.raw.as_ptr(), i as c_int) as f64 })
+        Ok(unsafe { ffi::sqlite3_column_double(statement.raw.as_ptr(), i as c_int) })
     }
 }
 
 impl Readable for i64 {
     #[inline]
     fn read(statement: &Statement, i: usize) -> Result<Self> {
-        Ok(unsafe { ffi::sqlite3_column_int64(statement.raw.as_ptr(), i as c_int) as i64 })
+        Ok(unsafe { ffi::sqlite3_column_int64(statement.raw.as_ptr(), i as c_int) })
     }
 }
 
@@ -397,8 +397,8 @@ impl Readable for Vec<u8> {
             }
             let count = ffi::sqlite3_column_bytes(statement.raw.as_ptr(), i as c_int) as usize;
             let mut buffer = Vec::with_capacity(count);
-            buffer.set_len(count);
             ptr::copy_nonoverlapping(pointer as *const u8, buffer.as_mut_ptr(), count);
+            buffer.set_len(count);
             Ok(buffer)
         }
     }

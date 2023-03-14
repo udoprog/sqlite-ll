@@ -1,18 +1,19 @@
 [package]
 name = "sqlite-ll"
 version = "0.1.0"
-license = "Apache-2.0/MIT"
-edition = "2021"
 authors = [
     "John-John Tedro <udoprog@tedro.se>"
 ]
+edition = "2021"
+rust-version = "1.60"
 description = "Low-level interface to the SQLite database"
 documentation = "https://docs.rs/sqlite-ll"
+readme = "README.md"
 homepage = "https://github.com/udoprog/sqlite-ll"
 repository = "https://github.com/udoprog/sqlite-ll"
-readme = "README.md"
-categories = ["api-bindings", "database"]
+license = "MIT/Apache-2.0"
 keywords = ["database"]
+categories = ["api-bindings", "database"]
 
 [features]
 default = ["linkage"]
@@ -26,4 +27,9 @@ version = "0.13.0"
 default-features = false
 
 [dev-dependencies]
+criterion = "0.4.0"
 temporary = "0.6.4"
+
+[[bench]]
+name = "statement_benches"
+harness = false

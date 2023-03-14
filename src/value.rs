@@ -22,7 +22,7 @@ impl Value {
     /// Return the binary data if the value is `Binary`.
     #[inline]
     pub fn as_blob(&self) -> Option<&[u8]> {
-        if let &Value::Blob(ref value) = self {
+        if let Value::Blob(value) = self {
             return Some(value);
         }
         None
@@ -49,7 +49,7 @@ impl Value {
     /// Return the string if the value is `String`.
     #[inline]
     pub fn as_string(&self) -> Option<&str> {
-        if let &Value::Text(ref value) = self {
+        if let Value::Text(value) = self {
             return Some(value);
         }
         None

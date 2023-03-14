@@ -41,7 +41,7 @@ pub(crate) unsafe fn cstr_to_str<'a>(s: *const c_char) -> Result<&'a str> {
 pub(crate) fn string_to_cstring(s: &str) -> Result<CString> {
     match CString::new(s) {
         Ok(string) => Ok(string),
-        _ => return Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
+        _ => Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
     }
 }
 
@@ -53,7 +53,7 @@ pub(crate) fn path_to_cstring(p: &Path) -> Result<CString> {
 
     match CString::new(p.as_bytes()) {
         Ok(string) => Ok(string),
-        Err(..) => return Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
+        Err(..) => Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
     }
 }
 
@@ -64,8 +64,8 @@ pub(crate) fn path_to_cstring(p: &Path) -> Result<CString> {
         None => return Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
     };
 
-    match CString::new(p.as_bytes()) {
+    match CString::new(s.as_bytes()) {
         Ok(string) => Ok(string),
-        Err(..) => return Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
+        Err(..) => Err(crate::error::Error::from_code(sqlite3_sys::SQLITE_MISUSE)),
     }
 }
