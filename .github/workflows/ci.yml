@@ -15,14 +15,18 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        rust: ["1.60", stable]
+        rust: ['1.56', stable]
     steps:
     - uses: actions/checkout@v3
     - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{matrix.rust}}
-    - run: cargo test --workspace --all-targets
-    - run: cargo test --workspace --doc
+    - run: cargo build
+      if: matrix.rust != 'stable'
+    - run: cargo test --all-targets
+      if: matrix.rust == 'stable'
+    - run: cargo test --doc
+      if: matrix.rust == 'stable'
 
   clippy:
     runs-on: ubuntu-latest
@@ -31,7 +35,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.68
       with:
         components: clippy
-    - run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+    - run: cargo clippy --all-features --all-targets -- -D warnings
 
   rustfmt:
     runs-on: ubuntu-latest
