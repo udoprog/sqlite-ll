@@ -20,7 +20,7 @@ default = ["linkage"]
 linkage = ["sqlite3-sys/linkage"]
 
 [dependencies]
-libc = "0.2.140"
+libc = "0.2.141"
 
 [dependencies.sqlite3-sys]
 version = "0.14.0"
