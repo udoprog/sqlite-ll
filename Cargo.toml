@@ -11,7 +11,7 @@ documentation = "https://docs.rs/sqlite-ll"
 readme = "README.md"
 homepage = "https://github.com/udoprog/sqlite-ll"
 repository = "https://github.com/udoprog/sqlite-ll"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 keywords = ["database"]
 categories = ["api-bindings", "database"]
 
