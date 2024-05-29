@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        rust: ['1.56', stable]
+        rust: ['1.63', stable]
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@master

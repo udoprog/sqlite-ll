@@ -5,7 +5,7 @@ authors = [
     "John-John Tedro <udoprog@tedro.se>"
 ]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.63"
 description = "Low-level interface to the SQLite database"
 documentation = "https://docs.rs/sqlite-ll"
 readme = "README.md"
