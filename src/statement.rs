@@ -1,15 +1,20 @@
-use std::mem::MaybeUninit;
-use std::ptr;
+use core::mem::{transmute, MaybeUninit};
+use core::ptr;
+
+use libc::{c_char, c_double, c_int};
+use sqlite3_sys as ffi;
 
 use crate::error::{Error, Result};
 use crate::utils;
 use crate::value::{Type, Value};
-use libc::{c_char, c_double, c_int};
-use sqlite3_sys as ffi;
 
 // https://sqlite.org/c3ref/c_static.html
 macro_rules! transient(
-    () => (::std::mem::transmute(!0 as *const ::libc::c_void));
+    () => {
+        transmute::<*const libc::c_void, Option<ffi::sqlite3_callback>>(
+            !0 as *const libc::c_void
+        )
+    };
 );
 
 /// A prepared statement.
