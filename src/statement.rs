@@ -225,7 +225,7 @@ impl Drop for Statement {
     }
 }
 
-impl<'a> Bindable for &'a Value {
+impl Bindable for &Value {
     fn bind(self, statement: &mut Statement, i: usize) -> Result<()> {
         match self {
             Value::Blob(value) => value.as_slice().bind(statement, i),
@@ -237,7 +237,7 @@ impl<'a> Bindable for &'a Value {
     }
 }
 
-impl<'a> Bindable for &'a [u8] {
+impl Bindable for &[u8] {
     #[inline]
     fn bind(self, statement: &mut Statement, i: usize) -> Result<()> {
         debug_assert!(i > 0, "the indexing starts from 1");
@@ -299,7 +299,7 @@ impl Bindable for i64 {
     }
 }
 
-impl<'a> Bindable for &'a str {
+impl Bindable for &str {
     #[inline]
     fn bind(self, statement: &mut Statement, i: usize) -> Result<()> {
         debug_assert!(i > 0, "the indexing starts from 1");
