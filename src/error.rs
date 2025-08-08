@@ -183,11 +183,11 @@ impl fmt::Display for Error {
         write!(f, "sqlite3 error (code {})", self.code.number())?;
 
         if let Some(string) = self.code.string() {
-            write!(f, ": {}", string)?;
+            write!(f, ": {string}")?;
         }
 
         if let Some(message) = &self.message {
-            write!(f, ": {}", message)?;
+            write!(f, ": {message}")?;
         }
 
         Ok(())
