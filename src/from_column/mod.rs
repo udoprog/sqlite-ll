@@ -744,6 +744,70 @@ impl<'stmt> FromColumn<'stmt> for &'stmt [u8] {
     }
 }
 
+/// [`FromColumn`] implementation which returns an array of `[u8; N]`.
+///
+/// # Examples
+///
+/// ```
+/// use sqll::Connection;
+///
+/// let c = Connection::open_in_memory()?;
+///
+/// c.execute(r#"
+///     CREATE TABLE blobs (blob BLOB);
+///
+///     INSERT INTO blobs (blob) VALUES (X'aabb'), (X'bbcc');
+/// "#)?;
+///
+/// let mut stmt = c.prepare("SELECT blob FROM blobs")?;
+///
+/// assert_eq!(stmt.next::<[u8; 2]>()?, Some(*b"\xaa\xbb"));
+/// assert_eq!(stmt.next::<[u8; 2]>()?, Some(*b"\xbb\xcc"));
+/// # Ok::<_, sqll::Error>(())
+/// ```
+///
+/// Trying to coerce from mismatched size:
+///
+/// ```
+/// use sqll::{Connection, Code};
+///
+/// let c = Connection::open_in_memory()?;
+///
+/// c.execute(r#"
+///     CREATE TABLE blobs (blob BLOB);
+///
+///     INSERT INTO blobs (blob) VALUES (X'aabb'), (X'bbcc');
+/// "#)?;
+///
+/// let mut stmt = c.prepare("SELECT blob FROM blobs")?;
+///
+/// while stmt.step()?.is_row() {
+///     let e = stmt.column::<[u8; 8]>(0).unwrap_err();
+///     assert_eq!(e.code(), Code::MISMATCH);
+///     assert_eq!(e.to_string(), "blob size must be exactly 8 bytes, but was 2");
+/// }
+/// # Ok::<_, sqll::Error>(())
+/// ```
+impl<const N: usize> FromColumn<'_> for [u8; N] {
+    type Type = ty::Blob;
+
+    #[inline]
+    fn from_column(stmt: &Statement, index: ty::Blob) -> Result<Self> {
+        let blob = FixedBlob::<N>::from_column(stmt, index)?;
+
+        match blob.into_bytes() {
+            Ok(bytes) => Ok(bytes),
+            Err(blob) => Err(Error::new(
+                Code::MISMATCH,
+                format_args!(
+                    "blob size must be exactly {N} bytes, but was {}",
+                    blob.len()
+                ),
+            )),
+        }
+    }
+}
+
 /// [`FromColumn`] implementation for [`FixedBlob`] which reads at most `N`
 /// bytes.
 ///

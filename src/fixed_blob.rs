@@ -114,21 +114,21 @@ impl<const N: usize> FixedBlob<N> {
     ///
     /// for id in stmt.iter::<FixedBlob<4>>() {
     ///     let id = id?;
-    ///     assert!(matches!(id.into_bytes(), Some([1, 2, 3, 4]) | None));
+    ///     assert!(matches!(id.into_bytes(), Ok([1, 2, 3, 4]) | Err(..)));
     /// }
     /// # Ok::<_, sqll::Error>(())
     /// ```
-    pub fn into_bytes(self) -> Option<[u8; N]> {
+    pub fn into_bytes(self) -> Result<[u8; N], Self> {
         if self.init != N {
-            return None;
+            return Err(self);
         }
 
         // SAFETY: All of the bytes in the sequence have been initialized and
-        // can be safety transmuted.
+        // can be safely transmuted.
         //
         // Method of transmuting comes from the implementation of
         // `MaybeUninit::array_assume_init` which is not yet stable.
-        unsafe { Some((&self.data as *const _ as *const [u8; N]).read()) }
+        unsafe { Ok((&self.data as *const _ as *const [u8; N]).read()) }
     }
 
     /// Coerce into the slice of initialized memory which is present.
@@ -381,15 +381,15 @@ impl<const N: usize> TryFrom<&[u8]> for FixedBlob<N> {
     #[inline]
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         unsafe {
-            let mut string = FixedBlob::<N>::new();
+            let mut blob = FixedBlob::<N>::new();
 
             if value.len() > N {
                 return Err(CapacityError::capacity(value.len(), N));
             }
 
-            ptr::copy_nonoverlapping(value.as_ptr(), string.as_mut_ptr(), value.len());
-            string.set_len(value.len());
-            Ok(string)
+            ptr::copy_nonoverlapping(value.as_ptr(), blob.as_mut_ptr(), value.len());
+            blob.set_len(value.len());
+            Ok(blob)
         }
     }
 }
