@@ -98,9 +98,7 @@ struct Opts {
 
 macro_rules! cmd {
     (in $path:expr, $cmd:expr $(, $arg:expr)* $(,)?) => {{
-        let mut name = Vec::new();
-        name.push(Display::to_string($cmd));
-        $(name.push(Display::to_string($arg));)*
+        let name = vec![Display::to_string($cmd), $(Display::to_string($arg),)*];
         let name = name.join(" ");
 
         println!("{name}");
@@ -233,8 +231,8 @@ async fn entry(opts: &Opts) -> Result<()> {
         Ok(())
     };
 
-    build(&minimum, &HEADERS).await?;
-    build(&bundled, &BUNDLED).await?;
+    build(&minimum, HEADERS).await?;
+    build(&bundled, BUNDLED).await?;
 
     println!("Generating bindings");
 
@@ -325,12 +323,11 @@ async fn download_latest_version(major_version: u64) -> Result<Option<Version>> 
     let mut versions = Vec::new();
 
     for tag in &tags {
-        if let Some(stripped) = tag.name.strip_prefix("version-") {
-            if let Ok(version) = Version::parse(stripped)
-                && version.major == major_version
-            {
-                versions.push(version);
-            }
+        if let Some(stripped) = tag.name.strip_prefix("version-")
+            && let Ok(version) = Version::parse(stripped)
+            && version.major == major_version
+        {
+            versions.push(version);
         }
     }
 
@@ -369,10 +366,10 @@ fn parse_versions(versions: &str) -> Result<(Version, Version)> {
     let bundled = bundled.context("missing bundled version")?;
 
     let minimum =
-        Version::parse(&minimum).with_context(|| anyhow!("invalid minimum version {minimum}"))?;
+        Version::parse(minimum).with_context(|| anyhow!("invalid minimum version {minimum}"))?;
 
     let bundled =
-        Version::parse(&bundled).with_context(|| anyhow!("invalid bundled version {bundled}"))?;
+        Version::parse(bundled).with_context(|| anyhow!("invalid bundled version {bundled}"))?;
 
     Ok((minimum, bundled))
 }
