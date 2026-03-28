@@ -912,6 +912,25 @@ lossy!(u128, "value {} cannot be converted to sqlite integer");
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(25)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
+///
+/// Inserting an empty string:
+///
+/// ```
+/// use sqll::{Connection, BIND_INDEX};
+///
+/// let c = Connection::open_in_memory()?;
+///
+/// c.execute(r#"
+///     CREATE TABLE strings (string TEXT);
+/// "#)?;
+///
+/// let mut stmt = c.prepare("INSERT INTO strings (string) VALUES (?)")?;
+/// stmt.execute((String::new(),))?;
+///
+/// let mut stmt = c.prepare("SELECT string FROM strings")?;
+/// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::new())]);
+/// # Ok::<_, sqll::Error>(())
+/// ```
 impl BindValue for str {
     #[inline]
     fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
