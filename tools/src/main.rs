@@ -11,6 +11,8 @@
 //! * `sqll-sys/sqlite3-version-bundled` to determine which version of sqlite3
 //!   to bundle.
 
+const BLOCKLIST: &[&str] = &["=3.52.0"];
+
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -32,7 +34,7 @@ use reqwest::Client;
 use reqwest::Method;
 use reqwest::Request;
 use reqwest::header;
-use semver::Version;
+use semver::{Version, VersionReq};
 use serde::Deserialize;
 use zip::ZipArchive;
 
@@ -132,6 +134,11 @@ async fn main() {
 
 async fn entry(opts: &Opts) -> Result<()> {
     let mut exclude = Vec::new();
+    let mut blocklist = Vec::new();
+
+    for req in BLOCKLIST {
+        blocklist.push(VersionReq::parse(*req)?);
+    }
 
     for &e in EXCLUDE {
         exclude.push(e.to_owned());
@@ -161,13 +168,13 @@ async fn entry(opts: &Opts) -> Result<()> {
         parse_versions(&version).with_context(|| anyhow!("parsing versions file"))?;
 
     if opts.update {
-        let Some(version) = download_latest_version(3).await? else {
+        let Some(version) = download_latest_version(3, &blocklist).await? else {
             println!("no remote version found");
             return Ok(());
         };
 
-        if bundled < version {
-            println!("Updating bundled version {bundled} -> {version}");
+        if bundled != version {
+            println!("Changing bundled version {bundled} -> {version}");
 
             replace_in_path(
                 &versions_file,
@@ -292,7 +299,10 @@ async fn entry(opts: &Opts) -> Result<()> {
 }
 
 /// Download the latest version using Github's public API.
-async fn download_latest_version(major_version: u64) -> Result<Option<Version>> {
+async fn download_latest_version(
+    major_version: u64,
+    blocklist: &[VersionReq],
+) -> Result<Option<Version>> {
     #[derive(Deserialize)]
     struct Tag {
         name: String,
@@ -326,6 +336,7 @@ async fn download_latest_version(major_version: u64) -> Result<Option<Version>> 
         if let Some(stripped) = tag.name.strip_prefix("version-")
             && let Ok(version) = Version::parse(stripped)
             && version.major == major_version
+            && !blocklist.iter().any(|req| req.matches(&version))
         {
             versions.push(version);
         }

@@ -5,7 +5,7 @@
 //! Bindings to [sqlite] for [sqll].
 //!
 //! Note that the metadata field of this crate specified which version of sqlite
-//! is provided *if* the `bundled` feature is enabled, like `+sqlite-3.52.0`.
+//! is provided *if* the `bundled` feature is enabled, like `+sqlite-3.51.3`.
 //!
 //! <br>
 //!
