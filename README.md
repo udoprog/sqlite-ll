@@ -32,15 +32,17 @@ You can find simple examples of this below.
 * [`examples/persons.rs`] - A simple table with users, a primary key,
   inserting and querying.
 * [`examples/axum.rs`] - Create an in-memory database connection and serve
-  it using [`axum`]. This showcases how do properly handle external
-  synchronization for the best performance.
+  it using [`axum`]. This showcases how to properly handle external
+  synchronization for the best performance in a real-world scenario.
+* [`examples/tokio_async.rs`] - Using `sqll` in an asynchronous context with
+  `tokio`.
 
 <br>
 
 #### Connecting and querying
 
 Here is a simple example of setting up an in-memory connection, creating a
-table, insert and query some rows:
+table, inserting and querying back some rows:
 
 ```rust
 use sqll::{Connection, Result};
@@ -177,6 +179,20 @@ assert_eq!(rows, expected);
 
 <br>
 
+#### Use in asynchronous contexts
+
+In order for sqlite to be used in asynchronous contexts, the [`Statement`]
+object usually needs to be `Send` and external synchronization necessary.
+Since sqlite is a synchronous library we have to defer any work done to a
+thread pool such as the one provided by [`tokio::task::spawn_blocking`]. To
+make a [`Statement`] `Send` you can use [`Statement::into_send`], but using
+it is `unsafe` since correct behavior depends on the build and runtime
+configuration of the sqlite library in use.
+
+See the [`tokio_async` example] for a complete example.
+
+</br>
+
 ## Features
 
 * `std` - Enable usage of the Rust standard library. Enabled by default.
@@ -204,32 +220,6 @@ assert_eq!(rows, expected);
 
 <br>
 
-## Why do we need another sqlite interface?
-
-For other low-level crates, it is difficult to set up and use prepared
-statements, They are mostly implemented in a manner which requires the
-caller to borrow the connection in use.
-
-This library implements database objects through the v2 API which ensures
-that the database remains alive for as long as objects associated with it
-are alive. This is implemented in the SQLite library itself.
-
-Prepared statements can be expensive to create and *should* be stored and
-re-used to achieve the best performance. This is something that crates like
-`rusqlite` implements, but can easily be done manually, with no overhead, by
-simply storing the [`Statement`] object directly behind a mutex. Statements
-can also benefit from using the [`Prepare::PERSISTENT`] option which this
-library supports through [`prepare_with`].
-
-This library is designed to the extent possible to avoid intermediary
-allocations. For example [calling `execute`] doesn't allocate externally of
-the sqlite3 bindings or we require that c-strings are used when SQLite
-itself doesn't provide an API for using Rust strings directly. It's also
-implemented as a thing layer on top of SQLite with minimal added
-abstractions ensuring you get the best possible performance.
-
-<br>
-
 ## License
 
 This is a rewrite of the [`sqlite` crate], and components used from there
@@ -242,17 +232,21 @@ have been copied under the MIT license.
 [`Connection`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#thread-safety
 [`examples/axum.rs`]: https://github.com/udoprog/sqll/blob/main/examples/axum.rs
 [`examples/persons.rs`]: https://github.com/udoprog/sqll/blob/main/examples/persons.rs
+[`examples/tokio_async.rs`]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
 [`execute`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.execute
-[`Row` derive]: https://docs.rs/sqll/latest/sqll/derive.Row.html
-[`Row`]: https://docs.rs/sqll/latest/sqll/trait.Row.html
 [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
 [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
 [`Prepare::PERSISTENT`]: https://docs.rs/sqll/latest/sqll/struct.Prepare.html#associatedconstant.PERSISTENT
 [`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
+[`Row` derive]: https://docs.rs/sqll/latest/sqll/derive.Row.html
+[`Row`]: https://docs.rs/sqll/latest/sqll/trait.Row.html
 [`sqlite` crate]: https://github.com/stainless-steel/sqlite
 [`sqll-sys`]: https://crates.io/crates/sqll-sys
+[`Statement::into_send`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.into_sendh
 [`Statement`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html
+[`tokio_async` example]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
+[`tokio::task::spawn_blocking`]: https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html
 [binding query parameters]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.bind
 [calling `execute`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.execute
 [reading rows]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next

@@ -411,9 +411,9 @@ impl Statement {
     ///
     /// Returns `None` when there are no more rows.
     ///
-    /// This is a higher level API than `step` and is less prone to misuse. Note
-    /// however that misuse never leads to corrupted data or undefined behavior,
-    /// only surprising behavior such as NULL values being auto-converted (see
+    /// This is a higher level API than `step` and is less prone to misuse.
+    /// Misuse never leads to corrupted data or undefined behavior, only
+    /// surprising behavior such as NULL values being auto-converted (see
     /// [`Statement::step`]).
     ///
     /// Note that since this borrows from a mutable reference, it is *not*
