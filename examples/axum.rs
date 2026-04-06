@@ -9,7 +9,7 @@ use anyhow::Result;
 use axum::response::{Html, IntoResponse};
 use axum::routing::get;
 use axum::{Extension, Router};
-use sqll::{OpenOptions, Prepare, SendStatement};
+use sqll::{OpenOptions, SendStatement};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tokio::task::{self, JoinError};
@@ -38,7 +38,10 @@ fn setup_database() -> Result<Database> {
         "#,
     )?;
 
-    let select = c.prepare_with("SELECT name, age FROM users", Prepare::PERSISTENT)?;
+    let select = c
+        .prepare_with("SELECT name, age FROM users")
+        .persistent()
+        .build()?;
 
     // SAFETY: We serialize all accesses to the statements behind a mutex.
     let inner = unsafe {

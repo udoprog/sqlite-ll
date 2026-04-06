@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::time::Instant;
 
-use sqll::{OpenOptions, Prepare, Row};
+use sqll::{OpenOptions, Row};
 
 #[derive(Row)]
 struct Person<'stmt> {
@@ -28,7 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stmt = c.prepare("INSERT INTO persons (name) VALUES (?), (?), (?)")?;
     stmt.execute(("Steven", "John", "Alex"))?;
 
-    let mut stmt = c.prepare_with("SELECT id, name FROM persons", Prepare::PERSISTENT)?;
+    let mut stmt = c
+        .prepare_with("SELECT id, name FROM persons")
+        .persistent()
+        .build()?;
 
     let mut o = io::sink();
 
