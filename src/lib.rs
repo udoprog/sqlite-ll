@@ -141,11 +141,11 @@
 //! out of sqlite. They contain all the state associated with a query and are
 //! expensive to construct so they should be re-used.
 //!
-//! Using a [`Prepare::PERSISTENT`] prepared statement to perform multiple
+//! Using a [`PrepareWith::persistent`] prepared statement to perform multiple
 //! queries:
 //!
 //! ```
-//! use sqll::{Connection, Prepare};
+//! use sqll::Connection;
 //!
 //! let c = Connection::open_in_memory()?;
 //!
@@ -156,7 +156,9 @@
 //!     INSERT INTO users VALUES ('Bob', 52);
 //! "#)?;
 //!
-//! let mut stmt = c.prepare_with("SELECT * FROM users WHERE age > ?", Prepare::PERSISTENT)?;
+//! let mut stmt = c.prepare_with("SELECT * FROM users WHERE age > ?")
+//!     .persistent()
+//!     .build()?;
 //!
 //! let mut rows = Vec::new();
 //!
@@ -238,13 +240,13 @@
 //! [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 //! [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
 //! [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
-//! [`Prepare::PERSISTENT`]: https://docs.rs/sqll/latest/sqll/struct.Prepare.html#associatedconstant.PERSISTENT
 //! [`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
+//! [`PrepareWith::persistent`]: https://docs.rs/sqll/latest/sqll/struct.PrepareWith.html#method.persistent
 //! [`Row` derive]: https://docs.rs/sqll/latest/sqll/derive.Row.html
 //! [`Row`]: https://docs.rs/sqll/latest/sqll/trait.Row.html
 //! [`sqlite` crate]: https://github.com/stainless-steel/sqlite
 //! [`sqll-sys`]: https://crates.io/crates/sqll-sys
-//! [`Statement::into_send`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.into_sendh
+//! [`Statement::into_send`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.into_send
 //! [`Statement`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html
 //! [`tokio_async` example]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
 //! [`tokio::task::spawn_blocking`]: https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html
@@ -299,7 +301,7 @@ pub use self::bind_value::BindValue;
 #[doc(inline)]
 pub use self::code::Code;
 #[doc(inline)]
-pub use self::connection::{Connection, Prepare, SendConnection};
+pub use self::connection::{Connection, Prepare, PrepareWith, SendConnection};
 #[doc(inline)]
 pub use self::error::{CapacityError, DatabaseNotFound, Error, NotThreadSafe, Result};
 #[doc(inline)]

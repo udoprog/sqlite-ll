@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sqll::{OpenOptions, Prepare, SendStatement};
+use sqll::{OpenOptions, SendStatement};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task;
@@ -29,8 +29,14 @@ fn setup_database() -> Result<Database> {
          "#,
     )?;
 
-    let select = c.prepare_with("SELECT age FROM users ORDER BY age", Prepare::PERSISTENT)?;
-    let update = c.prepare_with("UPDATE users SET age = age + ?", Prepare::PERSISTENT)?;
+    let select = c
+        .prepare_with("SELECT age FROM users ORDER BY age")
+        .persistent()
+        .build()?;
+    let update = c
+        .prepare_with("UPDATE users SET age = age + ?")
+        .persistent()
+        .build()?;
 
     // SAFETY: We serialize all accesses to the statements behind a mutex.
     let inner = unsafe {

@@ -162,7 +162,7 @@ impl Connection {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use sqll::{OpenOptions, Prepare, SendConnection};
+    /// use sqll::{OpenOptions, SendConnection};
     /// use anyhow::Result;
     /// use tokio::task;
     /// use tokio::sync::Mutex;
@@ -418,11 +418,11 @@ impl Connection {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn execute(&self, stmt: impl AsRef<str>) -> Result<()> {
-        self._execute(stmt.as_ref())
+    pub fn execute(&self, stmt: impl AsRef<[u8]>) -> Result<()> {
+        self.execute_raw(stmt.as_ref())
     }
 
-    fn _execute(&self, stmt: &str) -> Result<()> {
+    fn execute_raw(&self, stmt: &[u8]) -> Result<()> {
         unsafe {
             let mut ptr = stmt.as_ptr().cast();
             let mut len = stmt.len();
@@ -567,7 +567,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// use sqll::{Connection, Prepare};
+    /// use sqll::Connection;
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -587,8 +587,8 @@ impl Connection {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn prepare(&self, stmt: impl AsRef<str>) -> Result<Statement> {
-        self.prepare_with(stmt, Prepare::EMPTY)
+    pub fn prepare(&self, stmt: impl AsRef<[u8]>) -> Result<Statement> {
+        self.prepare_raw(stmt.as_ref(), Prepare::EMPTY)
     }
 
     /// Build a prepared statement with custom flags.
@@ -605,11 +605,15 @@ impl Connection {
     /// execute multiple statements, use [`execute`] instead.
     ///
     /// ```
-    /// use sqll::{Connection, Code, Prepare};
+    /// use sqll::{Connection, Code};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
-    /// let e = c.prepare_with("CREATE TABLE test (id INTEGER); INSERT INTO test (id) VALUES (1);", Prepare::PERSISTENT).unwrap_err();
+    /// let e = c.prepare_with("CREATE TABLE test (id INTEGER); INSERT INTO test (id) VALUES (1);")
+    ///     .persistent()
+    ///     .build()
+    ///     .unwrap_err();
+    ///
     /// assert_eq!(e.code(), Code::MISUSE);
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -619,7 +623,7 @@ impl Connection {
     /// # Examples
     ///
     /// ```
-    /// use sqll::{Connection, Prepare};
+    /// use sqll::Connection;
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -627,8 +631,13 @@ impl Connection {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?)", Prepare::PERSISTENT)?;
-    /// let mut query_stmt = c.prepare_with("SELECT id FROM test", Prepare::PERSISTENT)?;
+    /// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?)")
+    ///     .persistent()
+    ///     .build()?;
+    ///
+    /// let mut query_stmt = c.prepare_with("SELECT id FROM test")
+    ///     .persistent()
+    ///     .build()?;
     ///
     /// drop(c);
     ///
@@ -641,9 +650,18 @@ impl Connection {
     /// assert_eq!(query_stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
-    pub fn prepare_with(&self, stmt: impl AsRef<str>, flags: Prepare) -> Result<Statement> {
-        let stmt = stmt.as_ref();
+    pub fn prepare_with<S>(&self, stmt: S) -> PrepareWith<'_, S>
+    where
+        S: AsRef<[u8]>,
+    {
+        PrepareWith {
+            conn: self,
+            stmt,
+            flags: Prepare::EMPTY,
+        }
+    }
 
+    fn prepare_raw(&self, stmt: &[u8], flags: Prepare) -> Result<Statement> {
         unsafe {
             let mut raw = MaybeUninit::uninit();
             let mut rest = MaybeUninit::uninit();
@@ -990,5 +1008,96 @@ impl fmt::Debug for SendConnection {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
+    }
+}
+
+/// A builder for customizing a prepared [`Statement`].
+///
+/// See [`Connection::prepare_with`] for more details.
+pub struct PrepareWith<'a, S>
+where
+    S: AsRef<[u8]>,
+{
+    conn: &'a Connection,
+    stmt: S,
+    flags: Prepare,
+}
+
+impl<S> PrepareWith<'_, S>
+where
+    S: AsRef<[u8]>,
+{
+    /// Set custom flags for the prepared statement.
+    ///
+    /// When setting [`Prepare::PERSISTENT`] it is recommended to use
+    /// [`PrepareWith::persistent`] instead for improved readability.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Prepare};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE test (id INTEGER);
+    /// "#)?;
+    ///
+    /// let mut stmt = c.prepare_with("SELECT id FROM test")
+    ///     .with_flags(Prepare::PERSISTENT | Prepare::NO_VTAB)
+    ///     .build()?;
+    ///
+    /// stmt.bind(())?;
+    /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), []);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    #[inline]
+    pub fn with_flags(mut self, flags: Prepare) -> Self {
+        self.flags = flags;
+        self
+    }
+
+    /// Set the [`Prepare::PERSISTENT`] flag for the built prepared
+    /// [`Statement`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::Connection;
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE test (id INTEGER);
+    /// "#)?;
+    ///
+    /// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?)")
+    ///     .persistent()
+    ///     .build()?;
+    ///
+    /// let mut query_stmt = c.prepare_with("SELECT id FROM test")
+    ///     .persistent()
+    ///     .build()?;
+    ///
+    /// drop(c);
+    ///
+    /// /* .. */
+    ///
+    /// insert_stmt.bind(42)?;
+    /// assert!(insert_stmt.step()?.is_done());
+    ///
+    /// query_stmt.bind(())?;
+    /// assert_eq!(query_stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    #[inline]
+    pub fn persistent(self) -> Self {
+        self.with_flags(Prepare::PERSISTENT)
+    }
+
+    /// Build the prepared statement.
+    #[inline]
+    pub fn build(self) -> Result<Statement> {
+        self.conn.prepare_raw(self.stmt.as_ref(), self.flags)
     }
 }

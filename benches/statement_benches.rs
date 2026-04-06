@@ -2,7 +2,7 @@
 // license.
 
 use criterion::Criterion;
-use sqll::{Connection, Prepare};
+use sqll::Connection;
 
 criterion::criterion_group!(benches, read_statement, write_statement);
 criterion::criterion_main!(benches);
@@ -13,10 +13,9 @@ fn read_statement(bencher: &mut Criterion) {
     populate(&c, 100);
 
     let mut stmt = c
-        .prepare_with(
-            "SELECT * FROM data WHERE a > ? AND b > ?",
-            Prepare::PERSISTENT,
-        )
+        .prepare_with("SELECT * FROM data WHERE a > ? AND b > ?")
+        .persistent()
+        .build()
         .unwrap();
 
     bencher.bench_function("read_statement", |b| {
@@ -37,10 +36,9 @@ fn write_statement(bencher: &mut Criterion) {
     let c = create();
 
     let mut stmt = c
-        .prepare_with(
-            "INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)",
-            Prepare::PERSISTENT,
-        )
+        .prepare_with("INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)")
+        .persistent()
+        .build()
         .unwrap();
 
     bencher.bench_function("write_statement", |b| {

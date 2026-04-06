@@ -173,19 +173,19 @@ impl State {
 ///   using the [`Row`] trait.
 ///
 /// For durable prepared statements it is recommended that
-/// [`prepare_with`] is used with [`Prepare::PERSISTENT`] set.
+/// [`prepare_with`] is used with [`PrepareWith::persistent`] set.
 ///
 /// [`bind_value`]: Self::bind_value
 /// [`bind`]: Self::bind
 /// [`column`]: Self::column
-/// [`prepare_with`]: crate::Connection::prepare_with
-/// [`prepare`]: crate::Connection::prepare
 /// [`Connection`]: crate::Connection
 /// [`execute`]: Self::execute
 /// [`into_iter`]: Self::into_iter
 /// [`iter`]: Self::iter
 /// [`next`]: Self::next
-/// [`Prepare::PERSISTENT`]: crate::Prepare::PERSISTENT
+/// [`prepare_with`]: crate::Connection::prepare_with
+/// [`prepare`]: crate::Connection::prepare
+/// [`PrepareWith::persistent`]: crate::PrepareWith::persistent
 /// [`reset`]: Self::reset
 /// [`row`]: Self::row
 /// [`step`]: Self::step
@@ -194,7 +194,7 @@ impl State {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, Prepare};
+/// use sqll::Connection;
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -202,8 +202,13 @@ impl State {
 ///     CREATE TABLE test (id INTEGER);
 /// "#)?;
 ///
-/// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?);", Prepare::PERSISTENT)?;
-/// let mut query = c.prepare_with("SELECT id FROM test;", Prepare::PERSISTENT)?;
+/// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?);")
+///     .persistent()
+///     .build()?;
+///
+/// let mut query = c.prepare_with("SELECT id FROM test;")
+///     .persistent()
+///     .build()?;
 ///
 /// drop(c);
 ///
@@ -306,7 +311,7 @@ impl Statement {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use sqll::{OpenOptions, Prepare, SendStatement};
+    /// use sqll::{OpenOptions, SendStatement};
     /// use anyhow::Result;
     /// use tokio::task;
     /// use tokio::sync::Mutex;
@@ -336,8 +341,13 @@ impl Statement {
     ///         "#,
     ///     )?;
     ///
-    ///     let select = c.prepare_with("SELECT age FROM users ORDER BY age", Prepare::PERSISTENT)?;
-    ///     let update = c.prepare_with("UPDATE users SET age = age + ?", Prepare::PERSISTENT)?;
+    ///     let select = c.prepare_with("SELECT age FROM users ORDER BY age")
+    ///         .persistent()
+    ///         .build()?;
+    ///
+    ///     let update = c.prepare_with("UPDATE users SET age = age + ?")
+    ///         .persistent()
+    ///         .build()?;
     ///
     ///     // SAFETY: We serialize all accesses to the statements behind a mutex.
     ///     let inner = unsafe {
