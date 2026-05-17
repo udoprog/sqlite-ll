@@ -20,6 +20,10 @@ pub const SQLITE_FLOAT: ::core::ffi::c_int = 2;
 pub const SQLITE_BLOB: ::core::ffi::c_int = 4;
 pub const SQLITE_NULL: ::core::ffi::c_int = 5;
 pub const SQLITE_TEXT: ::core::ffi::c_int = 3;
+pub const SQLITE_SERIALIZE_NOCOPY: ::core::ffi::c_int = 1;
+pub const SQLITE_DESERIALIZE_FREEONCLOSE: ::core::ffi::c_int = 1;
+pub const SQLITE_DESERIALIZE_RESIZEABLE: ::core::ffi::c_int = 2;
+pub const SQLITE_DESERIALIZE_READONLY: ::core::ffi::c_int = 4;
 unsafe extern "C" {
     pub fn sqlite3_libversion() -> *const ::core::ffi::c_char;
 }
@@ -211,5 +215,23 @@ unsafe extern "C" {
     pub fn sqlite3_db_readonly(
         db: *mut sqlite3,
         zDbName: *const ::core::ffi::c_char,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn sqlite3_serialize(
+        db: *mut sqlite3,
+        zSchema: *const ::core::ffi::c_char,
+        piSize: *mut sqlite3_int64,
+        mFlags: ::core::ffi::c_uint,
+    ) -> *mut ::core::ffi::c_uchar;
+}
+unsafe extern "C" {
+    pub fn sqlite3_deserialize(
+        db: *mut sqlite3,
+        zSchema: *const ::core::ffi::c_char,
+        pData: *mut ::core::ffi::c_uchar,
+        szDb: sqlite3_int64,
+        szBuf: sqlite3_int64,
+        mFlags: ::core::ffi::c_uint,
     ) -> ::core::ffi::c_int;
 }
