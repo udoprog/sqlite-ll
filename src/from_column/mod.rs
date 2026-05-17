@@ -64,7 +64,7 @@ use crate::{
 ///     INSERT INTO test (ts) VALUES (1767675413);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT ts FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT ts FROM test")?;
 ///
 /// assert_eq!(stmt.next::<Timestamp>()?, Some(Timestamp { seconds: 1767675413 }));
 /// # Ok::<_, sqll::Error>(())
@@ -126,7 +126,7 @@ where
     ///     INSERT INTO ids (id) VALUES (X'abcdabcd');
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT id FROM ids")?;
+    /// let mut select = c.prepare_default("SELECT id FROM ids")?;
     /// assert!(select.step()?.is_row());
     ///
     /// assert_eq!(select.column::<Id>(0)?, Id(vec![0xab, 0xcd, 0xab, 0xcd]));
@@ -150,7 +150,7 @@ where
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 /// stmt.bind("Alice")?;
 ///
 /// assert_eq!(stmt.iter::<Null>().collect::<Vec<_>>(), [Ok(Null)]);
@@ -180,7 +180,7 @@ impl FromColumn<'_> for Null {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
 /// stmt.bind(None::<Value<'_>>)?;
 ///
 /// assert_eq!(stmt.next::<Value<'_>>(), Ok(Some(Value::text("Alice"))));
@@ -222,7 +222,7 @@ impl<'stmt> FromColumn<'stmt> for Value<'stmt> {
 ///     INSERT INTO numbers (value) VALUES (3.14), (2.71);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while let Some(value) = stmt.next::<f64>()? {
 ///     assert!(matches!(value, 3.14 | 2.71));
@@ -243,7 +243,7 @@ impl<'stmt> FromColumn<'stmt> for Value<'stmt> {
 ///     INSERT INTO numbers (value) VALUES (3.14), (2.71);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<i64>(0).unwrap_err();
@@ -256,7 +256,7 @@ impl FromColumn<'_> for f64 {
 
     #[inline]
     fn from_column(stmt: &Statement, index: ty::Float) -> Result<Self> {
-        Ok(unsafe { ffi::sqlite3_column_double(stmt.as_ptr(), index.index) })
+        Ok(unsafe { ffi::sqlite3_column_double(stmt.as_ptr(), index.column.raw()) })
     }
 }
 
@@ -278,7 +278,7 @@ impl FromColumn<'_> for f64 {
 ///     INSERT INTO numbers (value) VALUES (3.14), (2.71);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while let Some(value) = stmt.next::<f32>()? {
 ///     assert!(matches!(value, 3.14 | 2.71));
@@ -299,7 +299,7 @@ impl FromColumn<'_> for f64 {
 ///     INSERT INTO numbers (value) VALUES (3.14), (2.71);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<i32>(0).unwrap_err();
@@ -339,7 +339,7 @@ impl FromColumn<'_> for f32 {
 ///     INSERT INTO booleans (value) VALUES (TRUE), (FALSE);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM booleans")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM booleans")?;
 /// let values = stmt.iter::<bool>().collect::<Vec<_>>();
 /// assert_eq!(values, vec![Ok(true), Ok(false)]);
 /// # Ok::<_, sqll::Error>(())
@@ -358,7 +358,7 @@ impl FromColumn<'_> for f32 {
 ///     INSERT INTO booleans (value) VALUES (X'01'), (X'00');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM booleans")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM booleans")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<bool>(0).unwrap_err();
@@ -396,7 +396,7 @@ impl FromColumn<'_> for bool {
 ///     INSERT INTO numbers (value) VALUES (3), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while let Some(value) = stmt.next::<i64>()? {
 ///     assert!(matches!(value, 3 | 2));
@@ -417,7 +417,7 @@ impl FromColumn<'_> for bool {
 ///     INSERT INTO numbers (value) VALUES (3), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<f64>(0).unwrap_err();
@@ -430,7 +430,7 @@ impl FromColumn<'_> for i64 {
 
     #[inline]
     fn from_column(stmt: &Statement, index: ty::Integer) -> Result<Self> {
-        Ok(unsafe { ffi::sqlite3_column_int64(stmt.as_ptr(), index.index) })
+        Ok(unsafe { ffi::sqlite3_column_int64(stmt.as_ptr(), index.column.raw()) })
     }
 }
 
@@ -451,7 +451,7 @@ macro_rules! lossless {
         ///     INSERT INTO numbers (value) VALUES (3), (2);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+        /// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
         ///
         #[doc = concat!("while let Some(value) = stmt.next::<", stringify!($ty), ">()? {")]
         ///     assert!(matches!(value, 3 | 2));
@@ -472,7 +472,7 @@ macro_rules! lossless {
         ///     INSERT INTO numbers (value) VALUES (3), (2);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+        /// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
         ///
         /// while stmt.step()?.is_row() {
         ///     let e = stmt.column::<f64>(0).unwrap_err();
@@ -512,7 +512,7 @@ macro_rules! lossy {
         ///     INSERT INTO numbers (value) VALUES (-9223372036854775808);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+        /// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
         ///
         /// assert!(stmt.step()?.is_row());
         #[doc = concat!("let e = stmt.column::<", stringify!($ty), ">(0).unwrap_err();")]
@@ -533,7 +533,7 @@ macro_rules! lossy {
         ///     INSERT INTO numbers (value) VALUES (3), (2);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+        /// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
         ///
         #[doc = concat!("while let Some(value) = stmt.next::<", stringify!($ty), ">()? {")]
         ///     assert!(matches!(value, 3 | 2));
@@ -554,7 +554,7 @@ macro_rules! lossy {
         ///     INSERT INTO numbers (value) VALUES (3), (2);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT value FROM numbers")?;
+        /// let mut stmt = c.prepare_default("SELECT value FROM numbers")?;
         ///
         /// while stmt.step()?.is_row() {
         ///     let e = stmt.column::<f64>(0).unwrap_err();
@@ -604,7 +604,7 @@ lossless!(i128);
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
 ///
 /// assert_eq!(stmt.next::<&Text>()?, Some(Text::new(b"Alice")));
 /// assert_eq!(stmt.next::<&Text>()?, Some(Text::new(b"Bob")));
@@ -625,7 +625,7 @@ lossless!(i128);
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
 ///
 /// let e = stmt.next::<&Text>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
@@ -655,7 +655,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt Text {
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
 ///
 /// assert_eq!(stmt.next::<&str>()?, Some("Alice"));
 /// assert_eq!(stmt.next::<&str>()?, Some("Bob"));
@@ -676,7 +676,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt Text {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
 ///
 /// let e = stmt.next::<&str>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
@@ -706,7 +706,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt str {
 ///     INSERT INTO users (blob) VALUES (X'aabb'), (X'bbcc');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT blob FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT blob FROM users")?;
 ///
 /// while let Some(blob) = stmt.next::<&[u8]>()? {
 ///     assert!(matches!(blob, b"\xaa\xbb" | b"\xbb\xcc"));
@@ -727,7 +727,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt str {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<&[u8]>(0).unwrap_err();
@@ -759,7 +759,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt [u8] {
 ///     INSERT INTO blobs (blob) VALUES (X'aabb'), (X'bbcc');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT blob FROM blobs")?;
+/// let mut stmt = c.prepare_default("SELECT blob FROM blobs")?;
 ///
 /// assert_eq!(stmt.next::<[u8; 2]>()?, Some(*b"\xaa\xbb"));
 /// assert_eq!(stmt.next::<[u8; 2]>()?, Some(*b"\xbb\xcc"));
@@ -779,7 +779,7 @@ impl<'stmt> FromColumn<'stmt> for &'stmt [u8] {
 ///     INSERT INTO blobs (blob) VALUES (X'aabb'), (X'bbcc');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT blob FROM blobs")?;
+/// let mut stmt = c.prepare_default("SELECT blob FROM blobs")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.column::<[u8; 8]>(0).unwrap_err();
@@ -827,7 +827,7 @@ impl<const N: usize> FromColumn<'_> for [u8; N] {
 ///     INSERT INTO users (id) VALUES (X'01020304'), (X'0506070809');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
 ///
 /// assert!(stmt.step()?.is_row());
 /// let bytes = stmt.column::<FixedBlob<4>>(0)?;
@@ -872,7 +872,7 @@ impl<const N: usize> FromColumn<'_> for FixedBlob<N> {
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
 ///
 /// assert!(stmt.step()?.is_row());
 /// let bytes = stmt.column::<FixedText<5>>(0)?;
@@ -911,12 +911,12 @@ impl<const N: usize> FromColumn<'_> for FixedText<N> {
 ///     CREATE TABLE users (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO users (name, age) VALUES (?, ?)")?;
 ///
 /// stmt.execute(("Alice", None::<i64>))?;
 /// stmt.execute(("Bob", Some(30i64)))?;
 ///
-/// let mut stmt = c.prepare("SELECT name, age FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT name, age FROM users")?;
 ///
 /// let mut names_and_ages = Vec::new();
 ///

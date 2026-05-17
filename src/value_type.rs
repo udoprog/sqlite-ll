@@ -27,7 +27,7 @@ use crate::ffi;
 ///     INSERT INTO test (value, text_value) VALUES (42, 'Hello, world!');
 /// "#)?;
 ///
-/// let mut select = c.prepare("SELECT value, text_value FROM test")?;
+/// let mut select = c.prepare_default("SELECT value, text_value FROM test")?;
 ///
 /// assert!(select.step()?.is_row());
 /// assert_eq!(select.column_type(0), ValueType::INTEGER);
@@ -67,7 +67,7 @@ impl ValueType {
     ///     INSERT INTO test (value) VALUES (42);
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT value FROM test")?;
+    /// let mut select = c.prepare_default("SELECT value FROM test")?;
     /// assert_eq!(select.column_type(0), ValueType::NULL);
     /// assert!(select.step()?.is_row());
     ///
@@ -97,7 +97,7 @@ impl ValueType {
     ///     INSERT INTO test (value) VALUES (42.0);
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT value FROM test")?;
+    /// let mut select = c.prepare_default("SELECT value FROM test")?;
     /// assert_eq!(select.column_type(0), ValueType::NULL);
     /// assert!(select.step()?.is_row());
     ///
@@ -128,7 +128,7 @@ impl ValueType {
     ///     INSERT INTO test (value) VALUES ('Hello, world!');
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT value FROM test")?;
+    /// let mut select = c.prepare_default("SELECT value FROM test")?;
     /// assert_eq!(select.column_type(0), ValueType::NULL);
     /// assert!(select.step()?.is_row());
     ///
@@ -158,7 +158,7 @@ impl ValueType {
     ///     INSERT INTO test (value) VALUES (X'DEADBEEF');
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT value FROM test")?;
+    /// let mut select = c.prepare_default("SELECT value FROM test")?;
     /// assert_eq!(select.column_type(0), ValueType::NULL);
     /// assert!(select.step()?.is_row());
     ///
@@ -183,7 +183,7 @@ impl ValueType {
     ///     INSERT INTO test (value) VALUES (NULL);
     /// "#)?;
     ///
-    /// let mut select = c.prepare("SELECT value FROM test")?;
+    /// let mut select = c.prepare_default("SELECT value FROM test")?;
     /// assert_eq!(select.column_type(0), ValueType::NULL);
     /// assert!(select.step()?.is_row());
     ///

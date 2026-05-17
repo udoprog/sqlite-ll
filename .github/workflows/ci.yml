@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.91
+    - uses: dtolnay/rust-toolchain@1.95
     - run: cargo build --lib
     - run: cargo build --lib --features bundled
 
@@ -95,4 +95,4 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo doc --document-private-items --no-deps --all-features
+    - run: cargo doc --document-private-items --no-deps --features bundled

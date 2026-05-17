@@ -1,7 +1,5 @@
-use core::ffi::c_int;
-
 use crate::ffi;
-use crate::{Code, Error, Null, Result, Statement, ValueType};
+use crate::{Code, Column, Error, Null, Result, Statement, ValueType};
 
 use super::NotNull;
 
@@ -66,7 +64,7 @@ where
 {
     /// Perform checks and warm up for the given column ensuring that any
     /// auto-conversion that needs to occur to load the field is done.
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self>;
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self>;
 }
 
 /// [`Type`] implementation for any non-null value.
@@ -99,7 +97,7 @@ where
 ///     INSERT INTO test (value) VALUES ('Hello, world!'), (42), (3.14), (X'DEADBEEF');
 /// "#)?;
 ///
-/// let mut select = c.prepare("SELECT value FROM test")?;
+/// let mut select = c.prepare_default("SELECT value FROM test")?;
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::text("Hello, world!"))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::integer(42))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::float(3.14))));
@@ -154,7 +152,7 @@ pub(crate) enum AnyKind {
 ///     INSERT INTO test (value) VALUES ('Hello, world!'), (42), (3.14), (X'DEADBEEF');
 /// "#)?;
 ///
-/// let mut select = c.prepare("SELECT value FROM test")?;
+/// let mut select = c.prepare_default("SELECT value FROM test")?;
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::text("Hello, world!"))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::integer(42))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::float(3.14))));
@@ -164,12 +162,12 @@ pub(crate) enum AnyKind {
 /// ```
 unsafe impl Type for Any {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
-        let kind = match stmt.column_type(index) {
-            ValueType::BLOB => AnyKind::Blob(Blob::check(stmt, index)?),
-            ValueType::TEXT => AnyKind::Text(Text::check(stmt, index)?),
-            ValueType::FLOAT => AnyKind::Float(Float::check(stmt, index)?),
-            ValueType::INTEGER => AnyKind::Integer(Integer::check(stmt, index)?),
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
+        let kind = match stmt.column_type(column) {
+            ValueType::BLOB => AnyKind::Blob(Blob::check(stmt, column)?),
+            ValueType::TEXT => AnyKind::Text(Text::check(stmt, column)?),
+            ValueType::FLOAT => AnyKind::Float(Float::check(stmt, column)?),
+            ValueType::INTEGER => AnyKind::Integer(Integer::check(stmt, column)?),
             ty => {
                 return Err(Error::new(
                     Code::MISMATCH,
@@ -211,15 +209,15 @@ unsafe impl Type for Any {
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyNull>()?, Some(MyNull(..))));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 unsafe impl Type for Null {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
-        type_check(stmt, index, ValueType::NULL)?;
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
+        type_check(stmt, column, ValueType::NULL)?;
         Ok(Self)
     }
 }
@@ -262,13 +260,13 @@ unsafe impl Type for Null {
 ///     INSERT INTO test (value) VALUES (42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyInteger>()?, Some(MyInteger(42)));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub struct Integer {
-    pub(crate) index: c_int,
+    pub(crate) column: Column,
 }
 
 /// [`Type`] implementation for [`i64`].
@@ -299,16 +297,16 @@ pub struct Integer {
 ///     INSERT INTO test (value) VALUES (42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyInteger>()?, Some(MyInteger(42)));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 unsafe impl Type for Integer {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
-        type_check(stmt, index, ValueType::INTEGER)?;
-        Ok(Self { index })
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
+        type_check(stmt, column, ValueType::INTEGER)?;
+        Ok(Self { column })
     }
 }
 
@@ -349,13 +347,13 @@ unsafe impl Type for Integer {
 ///     INSERT INTO test (value) VALUES (4.42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyFloat>()?, Some(MyFloat(4.4..4.5))));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub struct Float {
-    pub(crate) index: c_int,
+    pub(crate) column: Column,
 }
 
 /// [`Type`] implementation for float.
@@ -385,16 +383,16 @@ pub struct Float {
 ///     INSERT INTO test (value) VALUES (4.42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyFloat>()?, Some(MyFloat(4.4..4.5))));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 unsafe impl Type for Float {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
-        type_check(stmt, index, ValueType::FLOAT)?;
-        Ok(Self { index })
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
+        type_check(stmt, column, ValueType::FLOAT)?;
+        Ok(Self { column })
     }
 }
 
@@ -433,13 +431,13 @@ unsafe impl Type for Float {
 ///     INSERT INTO test (value) VALUES ('Hello, world!');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyString>()?, Some(MyString("Hello, world!")));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub struct Text {
-    index: c_int,
+    column: Column,
     len: usize,
 }
 
@@ -458,8 +456,8 @@ impl Text {
 
     /// Returns the column index.
     #[inline]
-    pub(crate) fn column(&self) -> c_int {
-        self.index
+    pub(crate) fn column(&self) -> Column {
+        self.column
     }
 }
 
@@ -491,22 +489,22 @@ impl Text {
 ///     INSERT INTO test (value) VALUES ('Hello, world!');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyString>()?, Some(MyString("Hello, world!")));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 unsafe impl Type for Text {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
         unsafe {
             // Note that this type check is important, because it locks the type
             // of conversion we permit for a string column.
-            type_check(stmt, index, ValueType::TEXT)?;
+            type_check(stmt, column, ValueType::TEXT)?;
 
             // NB: This will force an internal conversion to UTF-8 if the column
             // is stored in UTF-16.
-            let len = ffi::sqlite3_column_bytes(stmt.as_ptr(), index);
+            let len = ffi::sqlite3_column_bytes(stmt.as_ptr(), column.raw());
 
             // This is unlikely to not be optimized out, but for the off chance
             // we still keep it.
@@ -517,7 +515,7 @@ unsafe impl Type for Text {
                 ));
             };
 
-            Ok(Self { index, len })
+            Ok(Self { column, len })
         }
     }
 }
@@ -557,13 +555,13 @@ unsafe impl Type for Text {
 ///     INSERT INTO test (value) VALUES (X'2A2B2C');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyBytes>()?, Some(MyBytes(&[0x2A, 0x2B, 0x2C])));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub struct Blob {
-    index: c_int,
+    column: Column,
     len: usize,
 }
 
@@ -582,8 +580,8 @@ impl Blob {
 
     /// Returns the column index.
     #[inline]
-    pub(crate) fn column(&self) -> c_int {
-        self.index
+    pub(crate) const fn column(&self) -> Column {
+        self.column
     }
 }
 
@@ -615,20 +613,20 @@ impl Blob {
 ///     INSERT INTO test (value) VALUES (X'2A2B2C');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyBytes>()?, Some(MyBytes(&[0x2A, 0x2B, 0x2C])));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 unsafe impl Type for Blob {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
         unsafe {
             // Note that this type check is important, because it locks the type
             // of conversion we permit for a blob column.
-            type_check(stmt, index, ValueType::BLOB)?;
+            type_check(stmt, column, ValueType::BLOB)?;
 
-            let len = ffi::sqlite3_column_bytes(stmt.as_ptr(), index);
+            let len = ffi::sqlite3_column_bytes(stmt.as_ptr(), column.raw());
 
             // This is unlikely to not be optimized out, but for the off chance
             // we still keep it.
@@ -639,7 +637,7 @@ unsafe impl Type for Blob {
                 ));
             };
 
-            Ok(Self { index, len })
+            Ok(Self { column, len })
         }
     }
 }
@@ -694,7 +692,7 @@ unsafe impl Type for Blob {
 ///     INSERT INTO test (value) VALUES (42), (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(Some(42))));
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(None)));
@@ -736,7 +734,7 @@ where
 ///     INSERT INTO test (value) VALUES (42), (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(Some(42))));
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(None)));
@@ -748,13 +746,13 @@ where
     T: NotNull,
 {
     #[inline]
-    fn check(stmt: &mut Statement, index: c_int) -> Result<Self> {
-        if stmt.column_type(index) == ValueType::NULL {
+    fn check(stmt: &mut Statement, column: Column) -> Result<Self> {
+        if stmt.column_type(column) == ValueType::NULL {
             return Ok(Nullable { inner: None });
         }
 
         Ok(Nullable {
-            inner: Some(T::check(stmt, index)?),
+            inner: Some(T::check(stmt, column)?),
         })
     }
 }
@@ -765,13 +763,13 @@ where
 //
 // See: https://sqlite.org/c3ref/column_blob.html
 #[inline(always)]
-fn type_check(stmt: &Statement, index: c_int, expected: ValueType) -> Result<()> {
-    if stmt.column_type(index) != expected {
+fn type_check(stmt: &Statement, column: Column, expected: ValueType) -> Result<()> {
+    if stmt.column_type(column) != expected {
         return Err(Error::new(
             Code::MISMATCH,
             format_args!(
                 "expected column type {expected} but found {}",
-                stmt.column_type(index)
+                stmt.column_type(column)
             ),
         ));
     }

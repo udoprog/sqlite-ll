@@ -8,8 +8,8 @@ use crate::ffi;
 use crate::ty::Type;
 use crate::utils::{c_to_error_text, c_to_text};
 use crate::{
-    Bind, BindValue, Code, Error, FromColumn, FromUnsizedColumn, NotThreadSafe, Result, Row, Text,
-    ValueType,
+    Bind, BindValue, Code, Column, Error, FromColumn, FromUnsizedColumn, Index, NotThreadSafe,
+    Result, Row, Text, ValueType,
 };
 
 /// A marker type representing NULL.
@@ -36,7 +36,7 @@ use crate::{
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare("SELECT value FROM test")?;
+/// let mut select = c.prepare_default("SELECT value FROM test")?;
 /// assert_eq!(select.iter::<Null>().collect::<Vec<_>>(), [Ok(Null)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -65,7 +65,7 @@ use crate::{
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM test")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyNull>()?, Some(MyNull(..))));
 /// # Ok::<_, sqll::Error>(())
@@ -99,7 +99,7 @@ impl State {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("INSERT INTO test (id) VALUES (1)")?;
+    /// let mut stmt = c.prepare_default("INSERT INTO test (id) VALUES (1)")?;
     /// assert!(stmt.step()?.is_done());
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -121,10 +121,10 @@ impl State {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("INSERT INTO test (id) VALUES (1)")?;
+    /// let mut stmt = c.prepare_default("INSERT INTO test (id) VALUES (1)")?;
     /// assert!(stmt.step()?.is_done());
     ///
-    /// let mut stmt = c.prepare("SELECT id FROM test")?;
+    /// let mut stmt = c.prepare_default("SELECT id FROM test")?;
     /// assert!(stmt.step()?.is_row());
     /// assert!(stmt.step()?.is_done());
     /// # Ok::<_, sqll::Error>(())
@@ -137,7 +137,7 @@ impl State {
 
 /// A prepared statement.
 ///
-/// Prepared statements are compiled from a [`Connection`] using [`prepare`] or
+/// Prepared statements are compiled from a [`Connection`] using [`prepare_default`] or
 /// [`prepare_with`]. The [`Connection`] which constructed the prepared
 /// statement will remain alive for as long as the statement is alive, even if
 /// the connection is closed.
@@ -184,7 +184,7 @@ impl State {
 /// [`iter`]: Self::iter
 /// [`next`]: Self::next
 /// [`prepare_with`]: crate::Connection::prepare_with
-/// [`prepare`]: crate::Connection::prepare
+/// [`prepare_default`]: crate::Connection::prepare_default
 /// [`PrepareWith::persistent`]: crate::PrepareWith::persistent
 /// [`reset`]: Self::reset
 /// [`row`]: Self::row
@@ -281,7 +281,7 @@ impl Statement {
     ///     .read_write()
     ///     .open_in_memory()?;
     ///
-    /// let mut s = c.prepare("SELECT 1")?;
+    /// let mut s = c.prepare_default("SELECT 1")?;
     ///
     /// let e = unsafe { s.into_send().unwrap_err() };
     /// assert!(matches!(e, sqll::NotThreadSafe { .. }));
@@ -449,7 +449,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users")?;
     ///
     /// let a = stmt.next::<Person<'_>>()?;
     /// let b = stmt.next::<Person<'_>>()?;
@@ -478,7 +478,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -537,7 +537,7 @@ impl Statement {
     ///     INSERT INTO users (id, name) VALUES (0, 'Alice'), (1, 'Bob');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT id, name FROM users;")?;
+    /// let mut stmt = c.prepare_default("SELECT id, name FROM users;")?;
     /// assert_eq!(stmt.column::<i64>(0).unwrap_err().code(), Code::MISMATCH);
     /// assert_eq!(stmt.column::<String>(1).unwrap_err().code(), Code::MISMATCH);
     ///
@@ -569,7 +569,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -627,11 +627,11 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 69);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("UPDATE users SET age = age + 1")?;
+    /// let mut stmt = c.prepare_default("UPDATE users SET age = age + 1")?;
     /// stmt.execute(())?;
     /// stmt.execute(())?;
     ///
-    /// let mut query = c.prepare("SELECT age FROM users ORDER BY name")?;
+    /// let mut query = c.prepare_default("SELECT age FROM users ORDER BY name")?;
     /// let results = query.iter::<i64>().collect::<Result<Vec<_>>>()?;
     /// assert_eq!(results, [44, 71]);
     /// # Ok::<_, sqll::Error>(())
@@ -674,7 +674,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > 40")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > 40")?;
     ///
     /// stmt.reset()?;
     /// let results = stmt.iter::<(String, i64)>().collect::<Result<Vec<_>>>()?;
@@ -729,14 +729,14 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > 40")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > 40")?;
     ///
-    /// let results = c.prepare("SELECT * FROM users WHERE age > 40")?
+    /// let results = c.prepare_default("SELECT * FROM users WHERE age > 40")?
     ///     .into_iter::<(String, i64)>().collect::<Result<Vec<_>>>()?;
     /// let expected = [(String::from("Alice"), 72)];
     /// assert_eq!(results, expected);
     ///
-    /// let results = c.prepare("SELECT * FROM users WHERE age > 40")?
+    /// let results = c.prepare_default("SELECT * FROM users WHERE age > 40")?
     ///     .into_iter::<Person>().collect::<Result<Vec<_>>>()?;
     /// let expected = [Person { name: String::from("Alice"), age: 72 }];
     /// assert_eq!(results, expected);
@@ -775,7 +775,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -821,7 +821,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -886,7 +886,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 72);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
+    /// let mut stmt = c.prepare_default("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
     /// stmt.bind(Binding { name: "Bob", age: 72, order_by: "age" })?;
     ///
     /// assert_eq!(stmt.next::<(String, u32)>()?, Some(("Bob".to_string(), 72)));
@@ -912,11 +912,11 @@ impl Statement {
     ///
     /// # Errors
     ///
-    /// The first parameter has index 1, attempting to bind to 0 will result in
-    /// an error.
+    /// The first bind parameter has a raw index of 1 as defined by
+    /// [`Index::BIND`], attempting to bind to 0 will result in an error.
     ///
     /// ```
-    /// use sqll::{Connection, Code};
+    /// use sqll::{Connection, Code, Index};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -924,8 +924,8 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE name = ?")?;
-    /// let e = stmt.bind_value(0, "Bob").unwrap_err();
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE name = ?")?;
+    /// let e = stmt.bind_value(Index::from_raw(0), "Bob").unwrap_err();
     /// assert_eq!(e.code(), Code::RANGE);
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -933,7 +933,7 @@ impl Statement {
     /// # Examples
     ///
     /// ```
-    /// use sqll::{Connection, Code};
+    /// use sqll::{Connection, Code, Index};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -941,14 +941,15 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE name = ?")?;
-    /// stmt.bind_value(1, "Bob")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE name = ?")?;
+    /// stmt.bind_value(Index::BIND, "Bob")?;
     ///
     /// assert!(stmt.step()?.is_done());
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn bind_value(&mut self, index: c_int, value: impl BindValue) -> Result<()> {
+    pub fn bind_value(&mut self, index: impl Into<Index>, value: impl BindValue) -> Result<()> {
+        let index = index.into();
         value.bind_value(self, index)
     }
 
@@ -961,7 +962,7 @@ impl Statement {
     /// # Examples
     ///
     /// ```
-    /// use sqll::Connection;
+    /// use sqll::{Connection, Index};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -969,20 +970,20 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let stmt = c.prepare("SELECT * FROM users WHERE name = :name")?;
-    /// assert_eq!(stmt.bind_parameter_index(c":name"), Some(1));
+    /// let stmt = c.prepare_default("SELECT * FROM users WHERE name = :name")?;
+    /// assert_eq!(stmt.bind_parameter_index(c":name"), Some(Index::BIND));
     /// assert_eq!(stmt.bind_parameter_index(c":asdf"), None);
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn bind_parameter_index(&self, parameter: impl AsRef<CStr>) -> Option<c_int> {
+    pub fn bind_parameter_index(&self, parameter: impl AsRef<CStr>) -> Option<Index> {
         let index = unsafe {
             ffi::sqlite3_bind_parameter_index(self.raw.as_ptr(), parameter.as_ref().as_ptr())
         };
 
         match index {
             0 => None,
-            _ => Some(index),
+            _ => Some(Index::from_raw(index)),
         }
     }
 
@@ -1010,7 +1011,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let mut select_stmt = c.prepare("SELECT * FROM users")?;
+    /// let mut select_stmt = c.prepare_default("SELECT * FROM users")?;
     /// assert_eq!(select_stmt.column_count(), 2);
     ///
     /// c.execute(r#"
@@ -1021,8 +1022,8 @@ impl Statement {
     /// select_stmt.reset()?;
     /// assert_eq!(select_stmt.column_count(), 2);
     ///
-    /// // In order to see the new column, we have to prepare a new statement.
-    /// let select_stmt = c.prepare("SELECT * FROM users")?;
+    /// // In order to see the new column, we have to prepare_default a new statement.
+    /// let select_stmt = c.prepare_default("SELECT * FROM users")?;
     /// assert_eq!(select_stmt.column_count(), 3);
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -1053,7 +1054,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare("SELECT * FROM users;")?;
+    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
     ///
     /// assert_eq!(stmt.column_name(0), Some(Text::new("name")));
     /// assert_eq!(stmt.column_name(1), Some(Text::new("age")));
@@ -1064,7 +1065,7 @@ impl Statement {
     /// # Examples
     ///
     /// ```
-    /// use sqll::Connection;
+    /// use sqll::{Connection, Column};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -1072,20 +1073,21 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare("SELECT * FROM users;")?;
+    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
     ///
     /// let cols = stmt.columns().collect::<Vec<_>>();
-    /// assert_eq!(cols, [0, 1]);
+    /// assert_eq!(cols, [Column::from_raw(0), Column::from_raw(1)]);
     /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["name", "age"]);
     ///
     /// let cols = stmt.columns().rev().collect::<Vec<_>>();
-    /// assert_eq!(cols, [1, 0]);
+    /// assert_eq!(cols, [Column::from_raw(1), Column::from_raw(0)]);
     /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["age", "name"]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn column_name(&self, index: c_int) -> Option<&Text> {
-        unsafe { c_to_text(ffi::sqlite3_column_name(self.raw.as_ptr(), index)) }
+    pub fn column_name(&self, column: impl Into<Column>) -> Option<&Text> {
+        let column = column.into();
+        unsafe { c_to_text(ffi::sqlite3_column_name(self.raw.as_ptr(), column.raw())) }
     }
 
     /// Return an iterator of column indexes.
@@ -1096,7 +1098,7 @@ impl Statement {
     /// # Examples
     ///
     /// ```
-    /// use sqll::Connection;
+    /// use sqll::{Connection, Column};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -1104,19 +1106,19 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare("SELECT * FROM users;")?;
+    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
     ///
     /// let cols = stmt.columns().collect::<Vec<_>>();
-    /// assert_eq!(cols, vec![0, 1]);
+    /// assert_eq!(cols, vec![Column::from_raw(0), Column::from_raw(1)]);
     ///
     /// let cols = stmt.columns().rev().collect::<Vec<_>>();
-    /// assert_eq!(cols, vec![1, 0]);
+    /// assert_eq!(cols, vec![Column::from_raw(1), Column::from_raw(0)]);
     ///
     /// let col = stmt.columns().nth(1);
-    /// assert_eq!(col, Some(1));
+    /// assert_eq!(col, Some(Column::from_raw(1)));
     ///
     /// let col = stmt.columns().rev().nth(1);
-    /// assert_eq!(col, Some(0));
+    /// assert_eq!(col, Some(Column::from_raw(0)));
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
@@ -1150,7 +1152,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER, occupation TEXT);
     /// "#)?;
     ///
-    /// let stmt = c.prepare("SELECT * FROM users;")?;
+    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
     ///
     /// let column_names = stmt.column_names().collect::<Vec<_>>();
     /// assert_eq!(column_names, vec![Text::new("name"), Text::new("age"), Text::new("occupation")]);
@@ -1194,7 +1196,7 @@ impl Statement {
     ///     INSERT INTO users (id, name, age, photo) VALUES (1, 'Bob', 30.5, X'01020304');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users")?;
     ///
     /// assert_eq!(stmt.column_type(0), ValueType::NULL);
     /// assert_eq!(stmt.column_type(1), ValueType::NULL);
@@ -1212,8 +1214,9 @@ impl Statement {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn column_type(&self, index: c_int) -> ValueType {
-        unsafe { ValueType::new(ffi::sqlite3_column_type(self.raw.as_ptr(), index)) }
+    pub fn column_type(&self, column: impl Into<Column>) -> ValueType {
+        let column = column.into();
+        unsafe { ValueType::new(ffi::sqlite3_column_type(self.raw.as_ptr(), column.raw())) }
     }
 
     /// Return the name for a bind parameter if it exists.
@@ -1223,7 +1226,7 @@ impl Statement {
     /// # Examples
     ///
     /// ```
-    /// use sqll::{Connection, Text};
+    /// use sqll::{Connection, Index, Text};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -1231,14 +1234,19 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let stmt = c.prepare("SELECT * FROM users WHERE name = :name")?;
-    /// assert_eq!(stmt.bind_parameter_name(1), Some(Text::new(":name")));
-    /// assert_eq!(stmt.bind_parameter_name(2), None);
+    /// let stmt = c.prepare_default("SELECT * FROM users WHERE name = :name")?;
+    /// assert_eq!(stmt.bind_parameter_name(Index::BIND), Some(Text::new(":name")));
+    /// assert_eq!(stmt.bind_parameter_name(Index::BIND + 1), None);
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn bind_parameter_name(&self, index: c_int) -> Option<&Text> {
-        unsafe { c_to_text(ffi::sqlite3_bind_parameter_name(self.raw.as_ptr(), index)) }
+    pub fn bind_parameter_name(&self, index: Index) -> Option<&Text> {
+        unsafe {
+            c_to_text(ffi::sqlite3_bind_parameter_name(
+                self.raw.as_ptr(),
+                index.raw(),
+            ))
+        }
     }
 
     /// Read a value from the entire row using the [`Row`] trait.
@@ -1261,7 +1269,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT name, age FROM users")?;
+    /// let mut stmt = c.prepare_default("SELECT name, age FROM users")?;
     ///
     /// assert!(stmt.step()?.is_row());
     /// assert_eq!(stmt.row::<(&str, i64)>()?, ("Alice", 72));
@@ -1299,7 +1307,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -1323,12 +1331,13 @@ impl Statement {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn column<'stmt, T>(&'stmt mut self, index: c_int) -> Result<T>
+    pub fn column<'stmt, T>(&'stmt mut self, column: impl Into<Column>) -> Result<T>
     where
         T: FromColumn<'stmt>,
     {
-        let prepare = T::Type::check(self, index)?;
-        T::from_column(self, prepare)
+        let column = column.into();
+        let prepare_default = T::Type::check(self, column)?;
+        T::from_column(self, prepare_default)
     }
 
     /// Borrow a value from a column using the [`FromUnsizedColumn`] trait.
@@ -1350,7 +1359,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT name FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age > ?")?;
     ///
     /// for age in [30, 50] {
     ///     stmt.bind(age)?;
@@ -1363,11 +1372,12 @@ impl Statement {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn unsized_column<T>(&mut self, index: c_int) -> Result<&T>
+    pub fn unsized_column<T>(&mut self, column: impl Into<Column>) -> Result<&T>
     where
         T: ?Sized + FromUnsizedColumn,
     {
-        let index = T::Type::check(self, index)?;
+        let column = column.into();
+        let index = T::Type::check(self, column)?;
         T::from_unsized_column(self, index)
     }
 }
@@ -1440,12 +1450,12 @@ impl<'a> Iterator for ColumnNames<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.stmt.column_name(self.range.next()?)
+        self.stmt.column_name(Column::from_raw(self.range.next()?))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.stmt.column_name(self.range.nth(n)?)
+        self.stmt.column_name(Column::from_raw(self.range.nth(n)?))
     }
 
     #[inline]
@@ -1457,12 +1467,14 @@ impl<'a> Iterator for ColumnNames<'a> {
 impl<'a> DoubleEndedIterator for ColumnNames<'a> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.stmt.column_name(self.range.next_back()?)
+        self.stmt
+            .column_name(Column::from_raw(self.range.next_back()?))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        self.stmt.column_name(self.range.nth_back(n)?)
+        self.stmt
+            .column_name(Column::from_raw(self.range.nth_back(n)?))
     }
 }
 
@@ -1481,16 +1493,16 @@ pub struct Columns {
 }
 
 impl Iterator for Columns {
-    type Item = c_int;
+    type Item = Column;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.range.next()
+        Some(Column::from_raw(self.range.next()?))
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.range.nth(n)
+        Some(Column::from_raw(self.range.nth(n)?))
     }
 
     #[inline]
@@ -1502,12 +1514,12 @@ impl Iterator for Columns {
 impl DoubleEndedIterator for Columns {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.range.next_back()
+        Some(Column::from_raw(self.range.next_back()?))
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        self.range.nth_back(n)
+        Some(Column::from_raw(self.range.nth_back(n)?))
     }
 }
 

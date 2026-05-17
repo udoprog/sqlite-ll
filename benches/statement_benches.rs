@@ -2,7 +2,7 @@
 // license.
 
 use criterion::Criterion;
-use sqll::Connection;
+use sqll::{Connection, Index};
 
 criterion::criterion_group!(benches, read_statement, write_statement);
 criterion::criterion_main!(benches);
@@ -21,8 +21,8 @@ fn read_statement(bencher: &mut Criterion) {
     bencher.bench_function("read_statement", |b| {
         b.iter(|| {
             stmt.reset().unwrap();
-            stmt.bind_value(1, 42).unwrap();
-            stmt.bind_value(2, 42.0).unwrap();
+            stmt.bind_value(Index::BIND, 42).unwrap();
+            stmt.bind_value(Index::BIND + 1, 42.0).unwrap();
 
             while stmt.step().unwrap().is_row() {
                 assert!(stmt.column::<i64>(0).unwrap() > 42);
@@ -44,10 +44,7 @@ fn write_statement(bencher: &mut Criterion) {
     bencher.bench_function("write_statement", |b| {
         b.iter(|| {
             stmt.reset().unwrap();
-            stmt.bind_value(1, 42).unwrap();
-            stmt.bind_value(2, 42.0).unwrap();
-            stmt.bind_value(3, 42.0).unwrap();
-            stmt.bind_value(4, 42.0).unwrap();
+            stmt.bind((42, 42.0, 42.0, 42.0)).unwrap();
             assert!(stmt.step().unwrap().is_done());
         });
     });
@@ -62,15 +59,12 @@ fn create() -> Connection {
 
 fn populate(c: &Connection, count: usize) {
     let mut statement = c
-        .prepare("INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)")
+        .prepare_default("INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)")
         .unwrap();
 
     for i in 0..count {
         statement.reset().unwrap();
-        statement.bind_value(1, i as i64).unwrap();
-        statement.bind_value(2, i as f64).unwrap();
-        statement.bind_value(3, i as f64).unwrap();
-        statement.bind_value(4, i as f64).unwrap();
+        statement.bind((i, i, i, i)).unwrap();
         assert!(statement.step().unwrap().is_done());
     }
 }

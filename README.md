@@ -12,10 +12,10 @@ Efficient interface to [SQLite] that doesn't get in your way.
 ## Usage
 
 The two primary methods to interact with an SQLite database through this
-crate is through [`execute`] and [`prepare`].
+crate is through [`execute`] and [`prepare_default`].
 
 The [`execute`] function is used for batch statements, and allows for
-multiple queries to be specified. [`prepare`] only allows for a single
+multiple queries to be specified. [`prepare_default`] only allows for a single
 statement to be specified, but in turn permits [reading rows] and [binding
 query parameters].
 
@@ -56,7 +56,7 @@ c.execute(r#"
     INSERT INTO users VALUES ('Bob', 52);
 "#)?;
 
-let results = c.prepare("SELECT name, age FROM users ORDER BY age")?
+let results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?
     .iter::<(String, u32)>()
     .collect::<Result<Vec<_>>>()?;
 
@@ -89,7 +89,7 @@ c.execute(r#"
     INSERT INTO users VALUES ('Bob', 52);
 "#)?;
 
-let mut results = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+let mut results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 
 while let Some(person) = results.next::<Person<'_>>()? {
     println!("{} is {} years old", person.name, person.age);
@@ -120,11 +120,11 @@ c.execute(r#"
    CREATE TABLE persons (name TEXT, age INTEGER);
 "#)?;
 
-let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
+let mut stmt = c.prepare_default("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
 stmt.execute(Person { name: "Alice", age: 30 })?;
 stmt.execute(Person { name: "Bob", age: 40 })?;
 
-let mut query = c.prepare("SELECT name, age FROM persons ORDER BY age")?;
+let mut query = c.prepare_default("SELECT name, age FROM persons ORDER BY age")?;
 
 let p = query.next::<Person<'_>>()?;
 assert_eq!(p, Some(Person { name: "Alice", age: 30 }));
@@ -141,11 +141,11 @@ Correct handling of prepared statements are crucial to get good performance
 out of sqlite. They contain all the state associated with a query and are
 expensive to construct so they should be re-used.
 
-Using a [`Prepare::PERSISTENT`] prepared statement to perform multiple
+Using a [`PrepareWith::persistent`] prepared statement to perform multiple
 queries:
 
 ```rust
-use sqll::{Connection, Prepare};
+use sqll::Connection;
 
 let c = Connection::open_in_memory()?;
 
@@ -156,7 +156,9 @@ c.execute(r#"
     INSERT INTO users VALUES ('Bob', 52);
 "#)?;
 
-let mut stmt = c.prepare_with("SELECT * FROM users WHERE age > ?", Prepare::PERSISTENT)?;
+let mut stmt = c.prepare_with("SELECT * FROM users WHERE age > ?")
+    .persistent()
+    .build()?;
 
 let mut rows = Vec::new();
 
@@ -237,13 +239,13 @@ have been copied under the MIT license.
 [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
 [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
-[`Prepare::PERSISTENT`]: https://docs.rs/sqll/latest/sqll/struct.Prepare.html#associatedconstant.PERSISTENT
-[`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
+[`prepare_default`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_default
+[`PrepareWith::persistent`]: https://docs.rs/sqll/latest/sqll/struct.PrepareWith.html#method.persistent
 [`Row` derive]: https://docs.rs/sqll/latest/sqll/derive.Row.html
 [`Row`]: https://docs.rs/sqll/latest/sqll/trait.Row.html
 [`sqlite` crate]: https://github.com/stainless-steel/sqlite
 [`sqll-sys`]: https://crates.io/crates/sqll-sys
-[`Statement::into_send`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.into_sendh
+[`Statement::into_send`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.into_send
 [`Statement`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html
 [`tokio_async` example]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
 [`tokio::task::spawn_blocking`]: https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html
