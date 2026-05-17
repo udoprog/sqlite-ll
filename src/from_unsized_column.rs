@@ -80,7 +80,7 @@ pub trait FromUnsizedColumn {
     ///     INSERT INTO ids (id) VALUES (X'abcdabcd');
     /// "#)?;
     ///
-    /// let mut select = c.prepare_default("SELECT id FROM ids")?;
+    /// let mut select = c.prepare("SELECT id FROM ids")?;
     /// assert!(select.step()?.is_row());
     ///
     /// assert_eq!(select.unsized_column::<Id>(0)?, Id::new(b"\xab\xcd\xab\xcd"));
@@ -110,7 +110,7 @@ pub trait FromUnsizedColumn {
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
+/// let mut stmt = c.prepare("SELECT name FROM users")?;
 ///
 /// assert!(stmt.step()?.is_row());
 /// let name = stmt.unsized_column::<Text>(0)?;
@@ -135,7 +135,7 @@ pub trait FromUnsizedColumn {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 /// let mut name = String::new();
 ///
 /// while stmt.step()?.is_row() {
@@ -179,7 +179,7 @@ impl FromUnsizedColumn for Text {
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
+/// let mut stmt = c.prepare("SELECT name FROM users")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let name = stmt.unsized_column::<str>(0)?;
@@ -201,7 +201,7 @@ impl FromUnsizedColumn for Text {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 /// let mut name = String::new();
 ///
 /// while stmt.step()?.is_row() {
@@ -246,7 +246,7 @@ impl FromUnsizedColumn for str {
 ///     INSERT INTO users (name) VALUES (X'aabb'), (X'bbcc'), (X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
+/// let mut stmt = c.prepare("SELECT name FROM users")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let name = stmt.unsized_column::<[u8]>(0)?;
@@ -268,7 +268,7 @@ impl FromUnsizedColumn for str {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let e = stmt.unsized_column::<[u8]>(0).unwrap_err();

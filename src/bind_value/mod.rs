@@ -48,7 +48,7 @@ pub trait BindValue {
     ///     CREATE TABLE ids (id BLOB NOT NULL);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("INSERT INTO ids (id) VALUES (?)")?;
+    /// let mut stmt = c.prepare("INSERT INTO ids (id) VALUES (?)")?;
     ///
     /// stmt.execute(Id(*b"abcdabcd"))?;
     /// # Ok::<_, sqll::Error>(())
@@ -80,7 +80,7 @@ where
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Null)?;
@@ -115,7 +115,7 @@ impl BindValue for Null {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.bind(Null)?;
 /// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::from("Alice"))]);
@@ -143,7 +143,7 @@ impl Bind for Null {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, None::<Value<'_>>)?;
@@ -178,7 +178,7 @@ impl BindValue for Value<'_> {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
 /// stmt.bind(None::<Value<'_>>)?;
 ///
 /// assert_eq!(stmt.next::<Value<'_>>(), Ok(Some(Value::text("Alice"))));
@@ -209,7 +209,7 @@ impl Bind for Value<'_> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, &b"Hello"[..])?;
@@ -259,7 +259,7 @@ impl BindValue for [u8] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(&b"Hello"[..])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -292,7 +292,7 @@ impl Bind for [u8] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, FixedBlob::from(b"Hello"))?;
@@ -327,7 +327,7 @@ impl<const N: usize> BindValue for FixedBlob<N> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(FixedBlob::from(b"Hello"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -360,7 +360,7 @@ impl<const N: usize> Bind for FixedBlob<N> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, b"Hello")?;
@@ -395,7 +395,7 @@ impl<const N: usize> BindValue for [u8; N] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 /// stmt.bind(b"Hello")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 ///
@@ -431,7 +431,7 @@ impl<const N: usize> Bind for [u8; N] {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, 2.0f64)?;
@@ -477,7 +477,7 @@ impl BindValue for f64 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2.0f64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
@@ -508,7 +508,7 @@ impl Bind for f64 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, 2.0f32)?;
@@ -551,7 +551,7 @@ impl BindValue for f32 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2.0f32)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
@@ -585,7 +585,7 @@ impl Bind for f32 {
 ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, 2i64)?;
@@ -631,7 +631,7 @@ impl BindValue for i64 {
 ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2i64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -666,7 +666,7 @@ impl Bind for i64 {
 ///     INSERT INTO booleans (value) VALUES (TRUE), (FALSE), (FALSE);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM booleans WHERE value != ?")?;
+/// let mut stmt = c.prepare("SELECT value FROM booleans WHERE value != ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, true)?;
@@ -706,7 +706,7 @@ impl BindValue for bool {
 ///     INSERT INTO booleans (value) VALUES (TRUE), (FALSE), (FALSE);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM booleans WHERE value != ?")?;
+/// let mut stmt = c.prepare("SELECT value FROM booleans WHERE value != ?")?;
 ///
 /// stmt.bind(true)?;
 /// assert_eq!(stmt.iter::<bool>().collect::<Vec<_>>(), [Ok(false), Ok(false)]);
@@ -739,7 +739,7 @@ macro_rules! lossless {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         #[doc = concat!("stmt.bind(2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
         /// # Ok::<_, sqll::Error>(())
@@ -781,7 +781,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         #[doc = concat!("let e = stmt.bind_value(Index::BIND, ", stringify!($ty), "::MAX).unwrap_err();")]
         /// assert_eq!(e.code(), sqll::Code::MISMATCH);
         /// # Ok::<_, sqll::Error>(())
@@ -800,7 +800,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
         #[doc = concat!("stmt.bind_value(Index::BIND, 2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -835,7 +835,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
         #[doc = concat!("let e = stmt.bind(", stringify!($ty), "::MAX).unwrap_err();")]
         /// assert_eq!(e.code(), sqll::Code::MISMATCH);
@@ -855,7 +855,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
         #[doc = concat!("stmt.bind(2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -905,7 +905,7 @@ cfg_select! {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, "Alice")?;
@@ -928,10 +928,10 @@ cfg_select! {
 ///     CREATE TABLE strings (string TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("INSERT INTO strings (string) VALUES (?)")?;
+/// let mut stmt = c.prepare("INSERT INTO strings (string) VALUES (?)")?;
 /// stmt.execute((String::new(),))?;
 ///
-/// let mut stmt = c.prepare_default("SELECT string FROM strings")?;
+/// let mut stmt = c.prepare("SELECT string FROM strings")?;
 /// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::new())]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -957,7 +957,7 @@ impl BindValue for str {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind("Alice")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -988,7 +988,7 @@ impl Bind for str {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Text::new(b"Alice"))?;
@@ -1040,7 +1040,7 @@ impl BindValue for Text {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(Text::new(b"Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -1074,7 +1074,7 @@ impl Bind for Text {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind_value(Index::BIND, FixedText::<5>::try_from("Alice")?)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -1102,7 +1102,7 @@ impl<const N: usize> BindValue for FixedText<N> {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(FixedText::<5>::try_from("Alice")?)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -1133,7 +1133,7 @@ impl<const N: usize> Bind for FixedText<N> {
 ///     CREATE TABLE users (id INTEGER, name TEXT, age REAL, photo BLOB, email TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+/// let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, None::<i64>)?;
@@ -1164,7 +1164,7 @@ impl<const N: usize> Bind for FixedText<N> {
 ///     CREATE TABLE users (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("INSERT INTO users (name, age) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, "Alice")?;
@@ -1176,7 +1176,7 @@ impl<const N: usize> Bind for FixedText<N> {
 /// stmt.bind_value(Index::BIND + 1, Some(30i64))?;
 /// assert!(stmt.step()?.is_done());
 ///
-/// let mut it = c.prepare_default("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
+/// let mut it = c.prepare("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
 /// assert_eq!(it.collect::<Vec<_>>(), [Ok((String::from("Alice"), None)), Ok((String::from("Bob"), Some(30)))]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -1211,7 +1211,7 @@ where
 ///     CREATE TABLE users (id INTEGER, name TEXT, age REAL, photo BLOB, email TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+/// let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
 /// stmt.execute((None::<i64>, None::<&str>, None::<f64>, None::<&[u8]>, None::<&str>))?;
 /// stmt.execute((Some(2i64), Some(b"Bob"), Some(69.42), Some(&[0x69u8, 0x42u8][..]), Some("Bob")))?;
 /// # Ok::<_, sqll::Error>(())
@@ -1228,11 +1228,11 @@ where
 ///     CREATE TABLE users (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("INSERT INTO users (name, age) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
 /// stmt.execute(("Alice", None::<i64>))?;
 /// stmt.execute(("Bob", Some(30i64)))?;
 ///
-/// let mut it = c.prepare_default("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
+/// let mut it = c.prepare("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
 /// assert_eq!(it.collect::<Vec<_>>(), [Ok((String::from("Alice"), None)), Ok((String::from("Bob"), Some(30)))]);
 /// # Ok::<_, sqll::Error>(())
 /// ```

@@ -30,7 +30,7 @@ impl Prepare {
 
     /// The PERSISTENT flag is a hint to the query planner that the prepared
     /// statement will be retained for a long time and probably reused many
-    /// times. Without this flag, [`Connection::prepare_default`] assume that the
+    /// times. Without this flag, [`Connection::prepare`] assume that the
     /// prepared statement will be used just once or at most a few times and
     /// then destroyed relatively soon.
     ///
@@ -214,7 +214,7 @@ impl Connection {
     ///                 let mut c = db.c.lock_owned().await;
     ///
     ///                 let task = task::spawn_blocking(move || {
-    ///                     let mut update = c.prepare_default("UPDATE users SET age = age + ?")?;
+    ///                     let mut update = c.prepare("UPDATE users SET age = age + ?")?;
     ///                     update.execute(2)
     ///                 });
     ///
@@ -229,7 +229,7 @@ impl Connection {
     ///                 let mut c = db.c.lock_owned().await;
     ///
     ///                 let task = task::spawn_blocking(move || -> Result<Option<i64>> {
-    ///                     let mut select = c.prepare_default("SELECT age FROM users ORDER BY age")?;
+    ///                     let mut select = c.prepare("SELECT age FROM users ORDER BY age")?;
     ///                     Ok(select.next::<i64>()?)
     ///                 });
     ///
@@ -379,11 +379,11 @@ impl Connection {
 
     /// Execute a batch of statements.
     ///
-    /// Unlike [`prepare_default`], this can be used to execute multiple statements
+    /// Unlike [`prepare`], this can be used to execute multiple statements
     /// separated by a semi-colon `;` and is internally optimized for one-off
     /// queries.
     ///
-    /// [`prepare_default`]: Self::prepare_default
+    /// [`prepare`]: Self::prepare
     ///
     /// # Errors
     ///
@@ -413,7 +413,7 @@ impl Connection {
     ///     INSERT INTO users VALUES ('Bob', 72);
     /// "#)?;
     ///
-    /// let results = c.prepare_default("SELECT name, age FROM users")?
+    /// let results = c.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
     ///     .collect::<Result<Vec<_>>>()?;
     ///
@@ -560,7 +560,7 @@ impl Connection {
     ///
     /// let c = Connection::open_in_memory()?;
     ///
-    /// let e = c.prepare_default("CREATE TABLE test (id INTEGER) /* test */; INSERT INTO test (id) VALUES (1);").unwrap_err();
+    /// let e = c.prepare("CREATE TABLE test (id INTEGER) /* test */; INSERT INTO test (id) VALUES (1);").unwrap_err();
     ///
     /// assert_eq!(e.code(), Code::MISUSE);
     /// # Ok::<_, sqll::Error>(())
@@ -579,8 +579,8 @@ impl Connection {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare_default("INSERT INTO test (id) VALUES (?);")?;
-    /// let mut query_stmt = c.prepare_default("SELECT id FROM test;")?;
+    /// let mut insert_stmt = c.prepare("INSERT INTO test (id) VALUES (?);")?;
+    /// let mut query_stmt = c.prepare("SELECT id FROM test;")?;
     ///
     /// drop(c);
     ///
@@ -591,7 +591,7 @@ impl Connection {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn prepare_default(&self, stmt: impl AsRef<[u8]>) -> Result<Statement> {
+    pub fn prepare(&self, stmt: impl AsRef<[u8]>) -> Result<Statement> {
         self.prepare_raw(stmt.as_ref(), Prepare::EMPTY)
     }
 
@@ -777,7 +777,7 @@ impl Connection {
     /// "#)?;
     /// assert_eq!(c.last_insert_rowid(), 3);
     ///
-    /// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?)")?;
+    /// let mut stmt = c.prepare("INSERT INTO users VALUES (?)")?;
     /// stmt.execute("Dave")?;
     ///
     /// assert_eq!(c.last_insert_rowid(), 4);
@@ -805,7 +805,7 @@ impl Connection {
     /// c.execute("INSERT INTO users (name) VALUES ('Dave')")?;
     /// assert_eq!(c.last_insert_rowid(), 4);
     ///
-    /// let mut select = c.prepare_default("SELECT id FROM users WHERE name = ?")?;
+    /// let mut select = c.prepare("SELECT id FROM users WHERE name = ?")?;
     /// select.bind("Dave")?;
     ///
     /// for id in select.iter::<i64>() {
@@ -986,7 +986,7 @@ impl Connection {
     /// let c2 = Connection::open_in_memory()?;
     /// c2.deserialize(c"main", &data)?;
     ///
-    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
     ///     .collect::<Result<Vec<_>>>()?;
     ///
@@ -1064,7 +1064,7 @@ impl Connection {
     /// let c2 = Connection::open_in_memory()?;
     /// c2.deserialize(c"main", &data)?;
     ///
-    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
     ///     .collect::<Result<Vec<_>>>()?;
     ///
@@ -1134,7 +1134,7 @@ impl Connection {
     /// let c2 = Connection::open_in_memory()?;
     /// c2.deserialize(c"main", &data)?;
     ///
-    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
     ///     .collect::<Result<Vec<_>>>()?;
     ///

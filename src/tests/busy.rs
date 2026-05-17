@@ -45,7 +45,7 @@ fn connection_busy_handler() -> Result<()> {
         guards.push(thread::spawn(move || -> Result<bool> {
             let mut c = Connection::open(path)?;
             c.busy_handler(|_| true)?;
-            let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+            let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
             stmt.bind_value(Index::BIND, 2i64)?;
             stmt.bind_value(Index::BIND + 1, "Bob")?;
             stmt.bind_value(Index::BIND + 2, 69.42)?;

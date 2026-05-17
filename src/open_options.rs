@@ -74,7 +74,7 @@ use crate::{Code, Connection, Error, Result};
 ///    INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
+/// let mut stmt = c.prepare("SELECT name FROM users")?;
 /// assert!(stmt.step()?.is_row());
 ///
 /// let e = c.execute("DROP TABLE users").unwrap_err();

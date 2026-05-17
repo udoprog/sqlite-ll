@@ -17,7 +17,7 @@ use crate::{Text, ValueType};
 ///     INSERT INTO test (value) VALUES ('Hello, world!'), (42), (3.14), (X'DEADBEEF');
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM test")?;
+/// let mut select = c.prepare("SELECT value FROM test")?;
 /// assert_eq!(select.next::<Value<'_>>()?, Some(Value::text("Hello, world!")));
 /// assert_eq!(select.next::<Value<'_>>()?, Some(Value::integer(42)));
 /// assert_eq!(select.next::<Value<'_>>()?, Some(Value::float(3.14)));
@@ -39,7 +39,7 @@ use crate::{Text, ValueType};
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM test")?;
+/// let mut select = c.prepare("SELECT value FROM test")?;
 /// let e = select.next::<Value<'_>>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 ///
@@ -236,7 +236,7 @@ impl<'stmt> Value<'stmt> {
     ///     INSERT INTO test (value) VALUES (42), (3.14), ('Hello, world!'), (X'DEADBEEF');
     /// "#)?;
     ///
-    /// let mut select = c.prepare_default("SELECT value FROM test")?;
+    /// let mut select = c.prepare("SELECT value FROM test")?;
     ///
     /// let value = select.next::<Value<'_>>()?.map(|v| v.column_type());
     /// assert_eq!(value, Some(ValueType::INTEGER));

@@ -28,7 +28,7 @@ fn deserialize_file() -> Result<()> {
     c.deserialize(c"main", &data)?;
 
     let rows = c
-        .prepare_default("SELECT name, age FROM users ORDER BY name")?
+        .prepare("SELECT name, age FROM users ORDER BY name")?
         .iter::<(String, u32)>()
         .collect::<sqll::Result<Vec<_>>>()?;
 

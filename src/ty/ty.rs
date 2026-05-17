@@ -97,7 +97,7 @@ where
 ///     INSERT INTO test (value) VALUES ('Hello, world!'), (42), (3.14), (X'DEADBEEF');
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM test")?;
+/// let mut select = c.prepare("SELECT value FROM test")?;
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::text("Hello, world!"))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::integer(42))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::float(3.14))));
@@ -152,7 +152,7 @@ pub(crate) enum AnyKind {
 ///     INSERT INTO test (value) VALUES ('Hello, world!'), (42), (3.14), (X'DEADBEEF');
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM test")?;
+/// let mut select = c.prepare("SELECT value FROM test")?;
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::text("Hello, world!"))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::integer(42))));
 /// assert_eq!(select.next::<MyValue<'_>>()?, Some(MyValue(Value::float(3.14))));
@@ -209,7 +209,7 @@ unsafe impl Type for Any {
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyNull>()?, Some(MyNull(..))));
 /// # Ok::<_, sqll::Error>(())
@@ -260,7 +260,7 @@ unsafe impl Type for Null {
 ///     INSERT INTO test (value) VALUES (42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyInteger>()?, Some(MyInteger(42)));
 /// # Ok::<_, sqll::Error>(())
@@ -297,7 +297,7 @@ pub struct Integer {
 ///     INSERT INTO test (value) VALUES (42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyInteger>()?, Some(MyInteger(42)));
 /// # Ok::<_, sqll::Error>(())
@@ -347,7 +347,7 @@ unsafe impl Type for Integer {
 ///     INSERT INTO test (value) VALUES (4.42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyFloat>()?, Some(MyFloat(4.4..4.5))));
 /// # Ok::<_, sqll::Error>(())
@@ -383,7 +383,7 @@ pub struct Float {
 ///     INSERT INTO test (value) VALUES (4.42);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyFloat>()?, Some(MyFloat(4.4..4.5))));
 /// # Ok::<_, sqll::Error>(())
@@ -431,7 +431,7 @@ unsafe impl Type for Float {
 ///     INSERT INTO test (value) VALUES ('Hello, world!');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyString>()?, Some(MyString("Hello, world!")));
 /// # Ok::<_, sqll::Error>(())
@@ -489,7 +489,7 @@ impl Text {
 ///     INSERT INTO test (value) VALUES ('Hello, world!');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyString>()?, Some(MyString("Hello, world!")));
 /// # Ok::<_, sqll::Error>(())
@@ -555,7 +555,7 @@ unsafe impl Type for Text {
 ///     INSERT INTO test (value) VALUES (X'2A2B2C');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyBytes>()?, Some(MyBytes(&[0x2A, 0x2B, 0x2C])));
 /// # Ok::<_, sqll::Error>(())
@@ -613,7 +613,7 @@ impl Blob {
 ///     INSERT INTO test (value) VALUES (X'2A2B2C');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyBytes>()?, Some(MyBytes(&[0x2A, 0x2B, 0x2C])));
 /// # Ok::<_, sqll::Error>(())
@@ -692,7 +692,7 @@ unsafe impl Type for Blob {
 ///     INSERT INTO test (value) VALUES (42), (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(Some(42))));
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(None)));
@@ -734,7 +734,7 @@ where
 ///     INSERT INTO test (value) VALUES (42), (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(Some(42))));
 /// assert_eq!(stmt.next::<MyOptional>()?, Some(MyOptional(None)));

@@ -36,7 +36,7 @@ use crate::{
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM test")?;
+/// let mut select = c.prepare("SELECT value FROM test")?;
 /// assert_eq!(select.iter::<Null>().collect::<Vec<_>>(), [Ok(Null)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -65,7 +65,7 @@ use crate::{
 ///     INSERT INTO test (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT value FROM test")?;
+/// let mut stmt = c.prepare("SELECT value FROM test")?;
 ///
 /// assert!(matches!(stmt.next::<MyNull>()?, Some(MyNull(..))));
 /// # Ok::<_, sqll::Error>(())
@@ -99,7 +99,7 @@ impl State {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("INSERT INTO test (id) VALUES (1)")?;
+    /// let mut stmt = c.prepare("INSERT INTO test (id) VALUES (1)")?;
     /// assert!(stmt.step()?.is_done());
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -121,10 +121,10 @@ impl State {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("INSERT INTO test (id) VALUES (1)")?;
+    /// let mut stmt = c.prepare("INSERT INTO test (id) VALUES (1)")?;
     /// assert!(stmt.step()?.is_done());
     ///
-    /// let mut stmt = c.prepare_default("SELECT id FROM test")?;
+    /// let mut stmt = c.prepare("SELECT id FROM test")?;
     /// assert!(stmt.step()?.is_row());
     /// assert!(stmt.step()?.is_done());
     /// # Ok::<_, sqll::Error>(())
@@ -137,7 +137,7 @@ impl State {
 
 /// A prepared statement.
 ///
-/// Prepared statements are compiled from a [`Connection`] using [`prepare_default`] or
+/// Prepared statements are compiled from a [`Connection`] using [`prepare`] or
 /// [`prepare_with`]. The [`Connection`] which constructed the prepared
 /// statement will remain alive for as long as the statement is alive, even if
 /// the connection is closed.
@@ -184,7 +184,7 @@ impl State {
 /// [`iter`]: Self::iter
 /// [`next`]: Self::next
 /// [`prepare_with`]: crate::Connection::prepare_with
-/// [`prepare_default`]: crate::Connection::prepare_default
+/// [`prepare`]: crate::Connection::prepare
 /// [`PrepareWith::persistent`]: crate::PrepareWith::persistent
 /// [`reset`]: Self::reset
 /// [`row`]: Self::row
@@ -281,7 +281,7 @@ impl Statement {
     ///     .read_write()
     ///     .open_in_memory()?;
     ///
-    /// let mut s = c.prepare_default("SELECT 1")?;
+    /// let mut s = c.prepare("SELECT 1")?;
     ///
     /// let e = unsafe { s.into_send().unwrap_err() };
     /// assert!(matches!(e, sqll::NotThreadSafe { .. }));
@@ -449,7 +449,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users")?;
     ///
     /// let a = stmt.next::<Person<'_>>()?;
     /// let b = stmt.next::<Person<'_>>()?;
@@ -478,7 +478,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -537,7 +537,7 @@ impl Statement {
     ///     INSERT INTO users (id, name) VALUES (0, 'Alice'), (1, 'Bob');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT id, name FROM users;")?;
+    /// let mut stmt = c.prepare("SELECT id, name FROM users;")?;
     /// assert_eq!(stmt.column::<i64>(0).unwrap_err().code(), Code::MISMATCH);
     /// assert_eq!(stmt.column::<String>(1).unwrap_err().code(), Code::MISMATCH);
     ///
@@ -569,7 +569,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -627,11 +627,11 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 69);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("UPDATE users SET age = age + 1")?;
+    /// let mut stmt = c.prepare("UPDATE users SET age = age + 1")?;
     /// stmt.execute(())?;
     /// stmt.execute(())?;
     ///
-    /// let mut query = c.prepare_default("SELECT age FROM users ORDER BY name")?;
+    /// let mut query = c.prepare("SELECT age FROM users ORDER BY name")?;
     /// let results = query.iter::<i64>().collect::<Result<Vec<_>>>()?;
     /// assert_eq!(results, [44, 71]);
     /// # Ok::<_, sqll::Error>(())
@@ -674,7 +674,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > 40")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > 40")?;
     ///
     /// stmt.reset()?;
     /// let results = stmt.iter::<(String, i64)>().collect::<Result<Vec<_>>>()?;
@@ -729,14 +729,14 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > 40")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > 40")?;
     ///
-    /// let results = c.prepare_default("SELECT * FROM users WHERE age > 40")?
+    /// let results = c.prepare("SELECT * FROM users WHERE age > 40")?
     ///     .into_iter::<(String, i64)>().collect::<Result<Vec<_>>>()?;
     /// let expected = [(String::from("Alice"), 72)];
     /// assert_eq!(results, expected);
     ///
-    /// let results = c.prepare_default("SELECT * FROM users WHERE age > 40")?
+    /// let results = c.prepare("SELECT * FROM users WHERE age > 40")?
     ///     .into_iter::<Person>().collect::<Result<Vec<_>>>()?;
     /// let expected = [Person { name: String::from("Alice"), age: 72 }];
     /// assert_eq!(results, expected);
@@ -775,7 +775,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -821,7 +821,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -886,7 +886,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 72);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
+    /// let mut stmt = c.prepare("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
     /// stmt.bind(Binding { name: "Bob", age: 72, order_by: "age" })?;
     ///
     /// assert_eq!(stmt.next::<(String, u32)>()?, Some(("Bob".to_string(), 72)));
@@ -924,7 +924,7 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE name = ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE name = ?")?;
     /// let e = stmt.bind_value(Index::from_raw(0), "Bob").unwrap_err();
     /// assert_eq!(e.code(), Code::RANGE);
     /// # Ok::<_, sqll::Error>(())
@@ -941,7 +941,7 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE name = ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE name = ?")?;
     /// stmt.bind_value(Index::BIND, "Bob")?;
     ///
     /// assert!(stmt.step()?.is_done());
@@ -970,7 +970,7 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users WHERE name = :name")?;
+    /// let stmt = c.prepare("SELECT * FROM users WHERE name = :name")?;
     /// assert_eq!(stmt.bind_parameter_index(c":name"), Some(Index::BIND));
     /// assert_eq!(stmt.bind_parameter_index(c":asdf"), None);
     /// # Ok::<_, sqll::Error>(())
@@ -1011,7 +1011,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let mut select_stmt = c.prepare_default("SELECT * FROM users")?;
+    /// let mut select_stmt = c.prepare("SELECT * FROM users")?;
     /// assert_eq!(select_stmt.column_count(), 2);
     ///
     /// c.execute(r#"
@@ -1022,8 +1022,8 @@ impl Statement {
     /// select_stmt.reset()?;
     /// assert_eq!(select_stmt.column_count(), 2);
     ///
-    /// // In order to see the new column, we have to prepare_default a new statement.
-    /// let select_stmt = c.prepare_default("SELECT * FROM users")?;
+    /// // In order to see the new column, we have to prepare a new statement.
+    /// let select_stmt = c.prepare("SELECT * FROM users")?;
     /// assert_eq!(select_stmt.column_count(), 3);
     /// # Ok::<_, sqll::Error>(())
     /// ```
@@ -1054,7 +1054,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
+    /// let stmt = c.prepare("SELECT * FROM users;")?;
     ///
     /// assert_eq!(stmt.column_name(0), Some(Text::new("name")));
     /// assert_eq!(stmt.column_name(1), Some(Text::new("age")));
@@ -1073,7 +1073,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
+    /// let stmt = c.prepare("SELECT * FROM users;")?;
     ///
     /// let cols = stmt.columns().collect::<Vec<_>>();
     /// assert_eq!(cols, [Column::from_raw(0), Column::from_raw(1)]);
@@ -1106,7 +1106,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
+    /// let stmt = c.prepare("SELECT * FROM users;")?;
     ///
     /// let cols = stmt.columns().collect::<Vec<_>>();
     /// assert_eq!(cols, vec![Column::from_raw(0), Column::from_raw(1)]);
@@ -1152,7 +1152,7 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER, occupation TEXT);
     /// "#)?;
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users;")?;
+    /// let stmt = c.prepare("SELECT * FROM users;")?;
     ///
     /// let column_names = stmt.column_names().collect::<Vec<_>>();
     /// assert_eq!(column_names, vec![Text::new("name"), Text::new("age"), Text::new("occupation")]);
@@ -1196,7 +1196,7 @@ impl Statement {
     ///     INSERT INTO users (id, name, age, photo) VALUES (1, 'Bob', 30.5, X'01020304');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users")?;
     ///
     /// assert_eq!(stmt.column_type(0), ValueType::NULL);
     /// assert_eq!(stmt.column_type(1), ValueType::NULL);
@@ -1234,7 +1234,7 @@ impl Statement {
     ///     CREATE TABLE users (name STRING)
     /// "#);
     ///
-    /// let stmt = c.prepare_default("SELECT * FROM users WHERE name = :name")?;
+    /// let stmt = c.prepare("SELECT * FROM users WHERE name = :name")?;
     /// assert_eq!(stmt.bind_parameter_name(Index::BIND), Some(Text::new(":name")));
     /// assert_eq!(stmt.bind_parameter_name(Index::BIND + 1), None);
     /// # Ok::<_, sqll::Error>(())
@@ -1269,7 +1269,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT name, age FROM users")?;
+    /// let mut stmt = c.prepare("SELECT name, age FROM users")?;
     ///
     /// assert!(stmt.step()?.is_row());
     /// assert_eq!(stmt.row::<(&str, i64)>()?, ("Alice", 72));
@@ -1307,7 +1307,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT * FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > ?")?;
     ///
     /// let mut results = Vec::new();
     ///
@@ -1336,8 +1336,8 @@ impl Statement {
         T: FromColumn<'stmt>,
     {
         let column = column.into();
-        let prepare_default = T::Type::check(self, column)?;
-        T::from_column(self, prepare_default)
+        let prepare = T::Type::check(self, column)?;
+        T::from_column(self, prepare)
     }
 
     /// Borrow a value from a column using the [`FromUnsizedColumn`] trait.
@@ -1359,7 +1359,7 @@ impl Statement {
     ///     INSERT INTO users VALUES ('Bob', 40);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age > ?")?;
+    /// let mut stmt = c.prepare("SELECT name FROM users WHERE age > ?")?;
     ///
     /// for age in [30, 50] {
     ///     stmt.bind(age)?;

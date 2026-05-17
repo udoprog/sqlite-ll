@@ -24,7 +24,7 @@ use crate::CapacityError;
 ///     INSERT INTO users (id) VALUES (X'01020304'), (X'0506070809');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 ///
 /// let ids = stmt.iter::<FixedBlob<10>>().collect::<Result<Vec<_>>>()?;
 /// assert_eq!(ids[0].as_slice(), &[1, 2, 3, 4]);
@@ -110,7 +110,7 @@ impl<const N: usize> FixedBlob<N> {
     ///     INSERT INTO users (id) VALUES (X'01020304'), (X'050607');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+    /// let mut stmt = c.prepare("SELECT id FROM users")?;
     ///
     /// for id in stmt.iter::<FixedBlob<4>>() {
     ///     let id = id?;
@@ -146,7 +146,7 @@ impl<const N: usize> FixedBlob<N> {
     ///     INSERT INTO users (id) VALUES (X'01020304'), (X'0506070809');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+    /// let mut stmt = c.prepare("SELECT id FROM users")?;
     ///
     /// for id in stmt.iter::<FixedBlob<10>>() {
     ///     let id = id?;

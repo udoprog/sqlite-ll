@@ -46,7 +46,7 @@ mod sealed {
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<MyType>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())
@@ -79,7 +79,7 @@ mod sealed {
 ///     INSERT INTO nulls (value) VALUES (NULL), (42);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// assert_eq!(select.next::<MyType>(), Ok(Some(MyType(None))));
 /// assert_eq!(select.next::<MyType>(), Ok(Some(MyType(Some(42)))));
 /// assert_eq!(select.next::<MyType>(), Ok(None));
@@ -115,7 +115,7 @@ where
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<Value<'_>>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())
@@ -144,7 +144,7 @@ impl NotNull for Any {}
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<i64>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())
@@ -173,7 +173,7 @@ impl NotNull for Integer {}
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<f64>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())
@@ -202,7 +202,7 @@ impl NotNull for Float {}
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<&str>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())
@@ -231,7 +231,7 @@ impl NotNull for Text {}
 ///     INSERT INTO nulls (value) VALUES (NULL);
 /// "#)?;
 ///
-/// let mut select = c.prepare_default("SELECT value FROM nulls")?;
+/// let mut select = c.prepare("SELECT value FROM nulls")?;
 /// let e = select.next::<&[u8]>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
 /// # Ok::<_, sqll::Error>(())

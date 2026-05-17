@@ -30,7 +30,7 @@ use crate::{BindValue, Error, Statement};
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
+/// let mut stmt = c.prepare("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
 /// stmt.bind(Binding { name: "Bob", age: 72, order_by: "age" })?;
 ///
 /// assert_eq!(stmt.next::<(String, u32)>()?, Some(("Bob".to_string(), 72)));
@@ -65,7 +65,7 @@ pub trait Bind {
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
+/// let mut stmt = c.prepare("SELECT name, age FROM users WHERE name = ? AND age = ? ORDER BY ?")?;
 /// stmt.bind(&Binding { name: "Bob", age: 72, order_by: "age" })?;
 ///
 /// assert_eq!(stmt.next::<(String, u32)>()?, Some(("Bob".to_string(), 72)));
@@ -97,7 +97,7 @@ where
 ///     CREATE TABLE config (key TEXT, value TEXT);
 /// "#)?;
 ///
-/// let mut insert = c.prepare_default("INSERT INTO config VALUES ('version', '1.0.0')")?;
+/// let mut insert = c.prepare("INSERT INTO config VALUES ('version', '1.0.0')")?;
 /// insert.execute(())?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -131,7 +131,7 @@ macro_rules! implement_tuple {
         #[doc = concat!("c.execute(\"CREATE TABLE users (", stringify!($var0), " INTEGER" $(, ", ", stringify!($var), " INTEGER")*, ")\")?;")]
         #[doc = concat!("c.execute(\"INSERT INTO users VALUES (", stringify!($v0) $(, ", ", stringify!($v0n))*, ")\")?;")]
         ///
-        #[doc = concat!("let mut stmt = c.prepare_default(\"SELECT * FROM users WHERE ", stringify!($var0), " = ?" $(, " AND ", stringify!($var), " = ?")*, "\")?;")]
+        #[doc = concat!("let mut stmt = c.prepare(\"SELECT * FROM users WHERE ", stringify!($var0), " = ?" $(, " AND ", stringify!($var), " = ?")*, "\")?;")]
         #[doc = concat!("stmt.bind((", stringify!($v0), "," $(, " ", stringify!($v0n), ",")*, "))?;")]
         #[doc = concat!("let v = stmt.next::<(", ty!($ty0), ",", $(" ", ty!($ty), ",",)* ")>()?.expect(\"missing\");")]
         /// assert_eq!(v.0, 0);

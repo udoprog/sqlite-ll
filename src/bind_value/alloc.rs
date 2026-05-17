@@ -23,7 +23,7 @@ use super::BindValue;
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, vec![b'H', b'e', b'l', b'l', b'o'])?;
@@ -58,7 +58,7 @@ impl BindValue for Vec<u8> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(vec![b'H', b'e', b'l', b'l', b'o'])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -89,7 +89,7 @@ impl Bind for Vec<u8> {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, String::from("Alice"))?;
@@ -118,7 +118,7 @@ impl BindValue for String {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(String::from("Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -150,7 +150,7 @@ impl Bind for String {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Box::<[u8]>::from([b'H', b'e', b'l', b'l', b'o']))?;
@@ -175,7 +175,7 @@ impl Bind for String {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Box::<str>::from("Alice"))?;
@@ -211,7 +211,7 @@ where
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(Box::<[u8]>::from([b'H', b'e', b'l', b'l', b'o']))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -234,7 +234,7 @@ where
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(Box::<str>::from("Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);

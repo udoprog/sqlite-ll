@@ -59,7 +59,7 @@ fn create() -> Connection {
 
 fn populate(c: &Connection, count: usize) {
     let mut statement = c
-        .prepare_default("INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)")
+        .prepare("INSERT INTO data (a, b, c, d) VALUES (?, ?, ?, ?)")
         .unwrap();
 
     for i in 0..count {

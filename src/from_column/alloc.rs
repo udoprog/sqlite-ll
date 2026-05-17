@@ -24,7 +24,7 @@ use super::FromColumn;
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
+/// let mut stmt = c.prepare("SELECT name FROM users")?;
 ///
 /// assert_eq!(stmt.next::<String>()?, Some(String::from("Alice")));
 /// assert_eq!(stmt.next::<String>()?, Some(String::from("Bob")));
@@ -45,7 +45,7 @@ use super::FromColumn;
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 ///
 /// let e = stmt.next::<String>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
@@ -80,7 +80,7 @@ impl FromColumn<'_> for String {
 ///     INSERT INTO users (blob) VALUES (X'aabb'), (X'bbcc');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT blob FROM users")?;
+/// let mut stmt = c.prepare("SELECT blob FROM users")?;
 ///
 /// assert_eq!(stmt.next::<Vec<u8>>()?, Some(vec![0xaa, 0xbb]));
 /// assert_eq!(stmt.next::<Vec<u8>>()?, Some(vec![0xbb, 0xcc]));
@@ -101,7 +101,7 @@ impl FromColumn<'_> for String {
 ///     INSERT INTO users (id) VALUES (1), (2);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare_default("SELECT id FROM users")?;
+/// let mut stmt = c.prepare("SELECT id FROM users")?;
 ///
 /// let e = stmt.next::<Vec::<u8>>().unwrap_err();
 /// assert_eq!(e.code(), Code::MISMATCH);
