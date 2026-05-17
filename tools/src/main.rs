@@ -261,9 +261,9 @@ async fn entry(opts: &Opts) -> Result<()> {
     if !opts.unfiltered {
         builder = builder
             .allowlist_item(format!("SQLITE_({constants})"))
-            .allowlist_item("SQLITE_PREPARE_.*")
+            .allowlist_item("SQLITE_(PREPARE_.*|DESERIALIZE_.*|SERIALIZE_.*)")
             .allowlist_item("sqlite3_(libversion_number|libversion|threadsafe)")
-            .allowlist_item("sqlite3_(reset|step|open_v2|close_v2|prepare_v3|finalize)")
+            .allowlist_item("sqlite3_(reset|step|open_v2|close_v2|prepare_v3|finalize|serialize|deserialize)")
             .allowlist_item("sqlite3_db_(readonly|handle)")
             .allowlist_item("sqlite3_(errstr|errmsg|extended_result_codes)")
             .allowlist_item("sqlite3_(clear_bindings|busy_handler|busy_timeout|changes|total_changes|last_insert_rowid)")
