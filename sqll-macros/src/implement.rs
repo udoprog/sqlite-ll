@@ -38,6 +38,8 @@ struct Tokens<'a> {
     row_t: TypePath<'a, 1>,
     statement: TypePath<'a, 1>,
     type_t: TypePath<'a, 2>,
+    index: TypePath<'a, 1>,
+    column: TypePath<'a, 1>,
 }
 
 struct TypePath<'a, const N: usize> {
@@ -79,6 +81,8 @@ impl<'a> Tokens<'a> {
             row_t: TypePath::new(crate_path, ["Row"]),
             statement: TypePath::new(crate_path, ["Statement"]),
             type_t: TypePath::new(crate_path, ["ty", "Type"]),
+            index: TypePath::new(crate_path, ["Index"]),
+            column: TypePath::new(crate_path, ["Column"]),
         }
     }
 }
@@ -198,6 +202,8 @@ fn inner(cx: &Ctxt, input: TokenStream, what: What) -> Result<TokenStream, ()> {
         result,
         row_t,
         statement,
+        index,
+        column,
     } = &tokens;
 
     let Struct {
@@ -213,7 +219,7 @@ fn inner(cx: &Ctxt, input: TokenStream, what: What) -> Result<TokenStream, ()> {
                 .zip(bindings.iter())
                 .map(|(field, binding)| match binding {
                     Binding::Index(n) => quote! {
-                        #bind_value_t::bind_value(&self.#field, stmt, #n)?;
+                        #bind_value_t::bind_value(&self.#field, stmt, #index::from_raw(#n))?;
                     },
                     Binding::Name(name) => quote! {{
                         let Some(index) = stmt.bind_parameter_index(#name) else {
@@ -289,7 +295,7 @@ fn inner(cx: &Ctxt, input: TokenStream, what: What) -> Result<TokenStream, ()> {
                 let c = quote::format_ident!("v{i}");
 
                 setup.push(quote! {
-                    let #c = <<#ty as #from_column_t::<#lt>>::Type as #column_type_t>::check(stmt, #index)?;
+                    let #c = <<#ty as #from_column_t::<#lt>>::Type as #column_type_t>::check(stmt, #column::from_raw(#index))?;
                 });
 
                 checked.push(c);

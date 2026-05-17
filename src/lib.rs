@@ -9,10 +9,10 @@
 //! ## Usage
 //!
 //! The two primary methods to interact with an SQLite database through this
-//! crate is through [`execute`] and [`prepare`].
+//! crate is through [`execute`] and [`prepare_default`].
 //!
 //! The [`execute`] function is used for batch statements, and allows for
-//! multiple queries to be specified. [`prepare`] only allows for a single
+//! multiple queries to be specified. [`prepare_default`] only allows for a single
 //! statement to be specified, but in turn permits [reading rows] and [binding
 //! query parameters].
 //!
@@ -53,7 +53,7 @@
 //!     INSERT INTO users VALUES ('Bob', 52);
 //! "#)?;
 //!
-//! let results = c.prepare("SELECT name, age FROM users ORDER BY age")?
+//! let results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?
 //!     .iter::<(String, u32)>()
 //!     .collect::<Result<Vec<_>>>()?;
 //!
@@ -87,7 +87,7 @@
 //!     INSERT INTO users VALUES ('Bob', 52);
 //! "#)?;
 //!
-//! let mut results = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+//! let mut results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 //!
 //! while let Some(person) = results.next::<Person<'_>>()? {
 //!     println!("{} is {} years old", person.name, person.age);
@@ -119,11 +119,11 @@
 //!    CREATE TABLE persons (name TEXT, age INTEGER);
 //! "#)?;
 //!
-//! let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
+//! let mut stmt = c.prepare_default("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
 //! stmt.execute(Person { name: "Alice", age: 30 })?;
 //! stmt.execute(Person { name: "Bob", age: 40 })?;
 //!
-//! let mut query = c.prepare("SELECT name, age FROM persons ORDER BY age")?;
+//! let mut query = c.prepare_default("SELECT name, age FROM persons ORDER BY age")?;
 //!
 //! let p = query.next::<Person<'_>>()?;
 //! assert_eq!(p, Some(Person { name: "Alice", age: 30 }));
@@ -240,7 +240,7 @@
 //! [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 //! [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
 //! [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
-//! [`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
+//! [`prepare_default`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_default
 //! [`PrepareWith::persistent`]: https://docs.rs/sqll/latest/sqll/struct.PrepareWith.html#method.persistent
 //! [`Row` derive]: https://docs.rs/sqll/latest/sqll/derive.Row.html
 //! [`Row`]: https://docs.rs/sqll/latest/sqll/trait.Row.html
@@ -275,6 +275,7 @@ mod bind;
 mod bind_value;
 mod bytes;
 mod code;
+mod column;
 mod connection;
 mod error;
 mod ffi;
@@ -282,9 +283,11 @@ mod fixed_blob;
 mod fixed_text;
 mod from_column;
 mod from_unsized_column;
+mod index;
 mod open_options;
 #[cfg(feature = "alloc")]
 mod owned;
+mod owned_bytes;
 mod row;
 mod statement;
 mod text;
@@ -295,11 +298,13 @@ mod value_type;
 mod version;
 
 #[doc(inline)]
-pub use self::bind::{BIND_INDEX, Bind};
+pub use self::bind::Bind;
 #[doc(inline)]
 pub use self::bind_value::BindValue;
 #[doc(inline)]
 pub use self::code::Code;
+#[doc(inline)]
+pub use self::column::Column;
 #[doc(inline)]
 pub use self::connection::{Connection, Prepare, PrepareWith, SendConnection};
 #[doc(inline)]
@@ -313,7 +318,11 @@ pub use self::from_column::FromColumn;
 #[doc(inline)]
 pub use self::from_unsized_column::FromUnsizedColumn;
 #[doc(inline)]
+pub use self::index::Index;
+#[doc(inline)]
 pub use self::open_options::OpenOptions;
+#[doc(inline)]
+pub use self::owned_bytes::OwnedBytes;
 #[doc(inline)]
 pub use self::row::Row;
 #[doc(inline)]
@@ -402,7 +411,7 @@ pub use self::version::{lib_version, lib_version_number};
 ///    CREATE TABLE persons (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
 /// let person = Person { name: "Alice", age: 30 };
 /// stmt.bind(person)?;
 /// # Ok::<_, sqll::Error>(())
@@ -438,7 +447,7 @@ pub use self::version::{lib_version, lib_version_number};
 ///    CREATE TABLE persons (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO persons (age, name) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO persons (age, name) VALUES (?, ?)")?;
 /// stmt.execute(Person { name: "Alice", age: 30 })?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -479,7 +488,7 @@ pub use self::version::{lib_version, lib_version_number};
 ///    CREATE TABLE persons (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:notname, :notage)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO persons (name, age) VALUES (:notname, :notage)")?;
 /// stmt.execute(Person { name: "Alice", age: 30 })?;
 /// # stmt.execute(PersonStr { name: "Alice", age: 30 })?;
 /// # Ok::<_, sqll::Error>(())
@@ -519,7 +528,7 @@ pub use sqll_macros::Bind;
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut results = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+/// let mut results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 ///
 /// while let Some(person) = results.next::<Person<'_>>()? {
 ///     println!("{} is {} years old", person.name, person.age);

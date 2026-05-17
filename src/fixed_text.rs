@@ -22,7 +22,7 @@ use crate::{CapacityError, FixedBlob, Text};
 ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users")?;
 ///
 /// let ids = stmt.iter::<FixedText<10>>().collect::<Result<Vec<_>>>()?;
 /// assert_eq!(&ids[0], "Alice");
@@ -82,7 +82,7 @@ impl<const N: usize> FixedText<N> {
     ///     INSERT INTO users (name) VALUES ('Alice'), ('Bob');
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("SELECT name FROM users")?;
+    /// let mut stmt = c.prepare_default("SELECT name FROM users")?;
     ///
     /// assert_eq! {
     ///     stmt.iter::<FixedText<6>>().collect::<Vec<_>>(),

@@ -37,7 +37,7 @@
 //!     INSERT INTO test (ts) VALUES (1767675413), (NULL);
 //! "#)?;
 //!
-//! let mut stmt = c.prepare("SELECT ts FROM test")?;
+//! let mut stmt = c.prepare_default("SELECT ts FROM test")?;
 //!
 //! assert_eq!(stmt.next::<Timestamp>()?, Some(Timestamp { seconds: 1767675413 }));
 //! assert_eq!(stmt.next::<Timestamp>()?, Some(Timestamp { seconds: i64::MIN }));

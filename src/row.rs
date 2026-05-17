@@ -1,6 +1,6 @@
 use crate::ty::Type;
 use crate::utils::repeat;
-use crate::{Error, FromColumn, Statement};
+use crate::{Column, Error, FromColumn, Statement};
 
 /// This allows a type to be constructed from a [`Statement`] using [`next`],
 /// [`iter`], or [`row`].
@@ -38,7 +38,7 @@ use crate::{Error, FromColumn, Statement};
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut results = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+/// let mut results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 ///
 /// while let Some((name, age)) = results.next::<(&str, u32)>()? {
 ///     println!("{name} is {age} years old");
@@ -69,7 +69,7 @@ use crate::{Error, FromColumn, Statement};
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut results = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+/// let mut results = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 ///
 /// while let Some(person) = results.next::<Person<'_>>()? {
 ///     println!("{} is {} years old", person.name, person.age);
@@ -106,7 +106,7 @@ use crate::{Error, FromColumn, Statement};
 ///     INSERT INTO users VALUES ('Bob', 72);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name, age FROM users ORDER BY age")?;
+/// let mut stmt = c.prepare_default("SELECT name, age FROM users ORDER BY age")?;
 ///
 /// while stmt.step()?.is_row() {
 ///     let person = stmt.row::<Person>()?;
@@ -131,8 +131,8 @@ where
 {
     #[inline]
     fn from_row(stmt: &'stmt mut Statement) -> Result<Self, Error> {
-        let prepare = T::Type::check(stmt, 0)?;
-        T::from_column(stmt, prepare)
+        let prepare_default = T::Type::check(stmt, Column::FIRST)?;
+        T::from_column(stmt, prepare_default)
     }
 }
 
@@ -160,7 +160,7 @@ macro_rules! implement_tuple {
         #[doc = concat!("c.execute(\"CREATE TABLE users (", stringify!($var0), " INTEGER" $(, ", ", stringify!($var), " INTEGER")*, ")\")?;")]
         #[doc = concat!("c.execute(\"INSERT INTO users VALUES (", stringify!($value0) $(, ", ", stringify!($value0n))*, ")\")?;")]
         ///
-        /// let mut stmt = c.prepare("SELECT * FROM users")?;
+        /// let mut stmt = c.prepare_default("SELECT * FROM users")?;
         ///
         #[doc = concat!("while let Some((", stringify!($var0), "," $(, " ", stringify!($var), ",")*, ")) = stmt.next::<(", ignore!($var0), "i64," $(, " ", ignore!($var), "i64,")*, ")>()? {")]
         #[doc = concat!("    assert_eq!(", stringify!($var0), ", ", stringify!($value0), ");")]
@@ -177,8 +177,8 @@ macro_rules! implement_tuple {
         {
             #[inline]
             fn from_row(stmt: &'stmt mut Statement) -> Result<Self, Error> {
-                let $var0 = <$ty0>::Type::check(stmt, $value0)?;
-                $(let $var = <$ty>::Type::check(stmt, $value0n)?;)*
+                let $var0 = <$ty0>::Type::check(stmt, $crate::Column::from($value0))?;
+                $(let $var = <$ty>::Type::check(stmt, $crate::Column::from($value0n))?;)*
                 let $var0 = <$ty0>::from_column(stmt, $var0)?;
                 $(let $var = <$ty>::from_column(stmt, $var)?;)*
                 Ok(($var0, $($var,)*))

@@ -6,6 +6,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ops::{BitOr, Deref, DerefMut};
 use core::ptr::{NonNull, null_mut};
+use core::slice;
 
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -14,7 +15,9 @@ use crate::ffi;
 #[cfg(feature = "alloc")]
 use crate::owned::Owned;
 use crate::utils::{c_to_error_text, sqlite3_try};
-use crate::{Code, DatabaseNotFound, Error, NotThreadSafe, OpenOptions, Result, Statement, Text};
+use crate::{
+    Code, DatabaseNotFound, Error, NotThreadSafe, OpenOptions, OwnedBytes, Result, Statement, Text,
+};
 
 /// A collection of flags use to prepare a statement.
 pub struct Prepare(c_uint);
@@ -27,7 +30,7 @@ impl Prepare {
 
     /// The PERSISTENT flag is a hint to the query planner that the prepared
     /// statement will be retained for a long time and probably reused many
-    /// times. Without this flag, [`Connection::prepare`] assume that the
+    /// times. Without this flag, [`Connection::prepare_default`] assume that the
     /// prepared statement will be used just once or at most a few times and
     /// then destroyed relatively soon.
     ///
@@ -211,7 +214,7 @@ impl Connection {
     ///                 let mut c = db.c.lock_owned().await;
     ///
     ///                 let task = task::spawn_blocking(move || {
-    ///                     let mut update = c.prepare("UPDATE users SET age = age + ?")?;
+    ///                     let mut update = c.prepare_default("UPDATE users SET age = age + ?")?;
     ///                     update.execute(2)
     ///                 });
     ///
@@ -226,7 +229,7 @@ impl Connection {
     ///                 let mut c = db.c.lock_owned().await;
     ///
     ///                 let task = task::spawn_blocking(move || -> Result<Option<i64>> {
-    ///                     let mut select = c.prepare("SELECT age FROM users ORDER BY age")?;
+    ///                     let mut select = c.prepare_default("SELECT age FROM users ORDER BY age")?;
     ///                     Ok(select.next::<i64>()?)
     ///                 });
     ///
@@ -376,11 +379,11 @@ impl Connection {
 
     /// Execute a batch of statements.
     ///
-    /// Unlike [`prepare`], this can be used to execute multiple statements
+    /// Unlike [`prepare_default`], this can be used to execute multiple statements
     /// separated by a semi-colon `;` and is internally optimized for one-off
     /// queries.
     ///
-    /// [`prepare`]: Self::prepare
+    /// [`prepare_default`]: Self::prepare_default
     ///
     /// # Errors
     ///
@@ -410,7 +413,7 @@ impl Connection {
     ///     INSERT INTO users VALUES ('Bob', 72);
     /// "#)?;
     ///
-    /// let results = c.prepare("SELECT name, age FROM users")?
+    /// let results = c.prepare_default("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
     ///     .collect::<Result<Vec<_>>>()?;
     ///
@@ -539,9 +542,10 @@ impl Connection {
         unsafe { c_to_error_text(ffi::sqlite3_errmsg(self.raw.as_ptr())) }
     }
 
-    /// Build a prepared statement.
+    /// Build a prepared statement with default options.
     ///
-    /// This is the same as calling `prepare_with` with `Prepare::EMPTY`.
+    /// This is the same as calling `prepare_with` with without setting any
+    /// options.
     ///
     /// The database connection will be kept open for the lifetime of this
     /// statement.
@@ -556,7 +560,7 @@ impl Connection {
     ///
     /// let c = Connection::open_in_memory()?;
     ///
-    /// let e = c.prepare("CREATE TABLE test (id INTEGER) /* test */; INSERT INTO test (id) VALUES (1);").unwrap_err();
+    /// let e = c.prepare_default("CREATE TABLE test (id INTEGER) /* test */; INSERT INTO test (id) VALUES (1);").unwrap_err();
     ///
     /// assert_eq!(e.code(), Code::MISUSE);
     /// # Ok::<_, sqll::Error>(())
@@ -575,8 +579,8 @@ impl Connection {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare("INSERT INTO test (id) VALUES (?);")?;
-    /// let mut query_stmt = c.prepare("SELECT id FROM test;")?;
+    /// let mut insert_stmt = c.prepare_default("INSERT INTO test (id) VALUES (?);")?;
+    /// let mut query_stmt = c.prepare_default("SELECT id FROM test;")?;
     ///
     /// drop(c);
     ///
@@ -587,7 +591,7 @@ impl Connection {
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
-    pub fn prepare(&self, stmt: impl AsRef<[u8]>) -> Result<Statement> {
+    pub fn prepare_default(&self, stmt: impl AsRef<[u8]>) -> Result<Statement> {
         self.prepare_raw(stmt.as_ref(), Prepare::EMPTY)
     }
 
@@ -773,7 +777,7 @@ impl Connection {
     /// "#)?;
     /// assert_eq!(c.last_insert_rowid(), 3);
     ///
-    /// let mut stmt = c.prepare("INSERT INTO users VALUES (?)")?;
+    /// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?)")?;
     /// stmt.execute("Dave")?;
     ///
     /// assert_eq!(c.last_insert_rowid(), 4);
@@ -801,7 +805,7 @@ impl Connection {
     /// c.execute("INSERT INTO users (name) VALUES ('Dave')")?;
     /// assert_eq!(c.last_insert_rowid(), 4);
     ///
-    /// let mut select = c.prepare("SELECT id FROM users WHERE name = ?")?;
+    /// let mut select = c.prepare_default("SELECT id FROM users WHERE name = ?")?;
     /// select.bind("Dave")?;
     ///
     /// for id in select.iter::<i64>() {
@@ -948,6 +952,206 @@ impl Connection {
                 ffi::sqlite3_busy_timeout(
                     self.raw.as_ptr(),
                     ms
+                )
+            };
+        }
+
+        Ok(())
+    }
+
+    /// Serialize the database to a byte buffer.
+    ///
+    /// The returned buffer is allocated by sqlite and will be freed when
+    /// dropped.
+    ///
+    /// The `name` parameter specifies the name of the database to serialize,
+    /// which is typically "main" for the main database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Result};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE users (name TEXT, age INTEGER);
+    ///     INSERT INTO users VALUES ('Alice', 42);
+    ///     INSERT INTO users VALUES ('Bob', 72);
+    /// "#)?;
+    ///
+    /// let data = c.serialize(c"main")?;
+    /// assert!(!data.is_empty());
+    ///
+    /// let c2 = Connection::open_in_memory()?;
+    /// c2.deserialize(c"main", &data)?;
+    ///
+    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    ///     .iter::<(String, u32)>()
+    ///     .collect::<Result<Vec<_>>>()?;
+    ///
+    /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    pub fn serialize(&self, name: &CStr) -> Result<OwnedBytes, Error> {
+        unsafe {
+            let mut len = MaybeUninit::uninit();
+
+            match ffi::sqlite3_serialize(self.raw.as_ptr(), name.as_ptr(), len.as_mut_ptr(), 0) {
+                ptr if ptr.is_null() => {
+                    Err(Error::new(Code::NOMEM, "failed to serialize database"))
+                }
+                ptr => {
+                    let ptr = NonNull::new_unchecked(ptr);
+                    let len = len.assume_init();
+
+                    let Ok(len) = usize::try_from(len) else {
+                        ffi::sqlite3_free(ptr.as_ptr().cast());
+
+                        return Err(Error::new(
+                            Code::ERROR,
+                            format_args!(
+                                "failed to serialize database, returned size {len} is non-sensical"
+                            ),
+                        ));
+                    };
+
+                    Ok(OwnedBytes::from_raw(ptr, len))
+                }
+            }
+        }
+    }
+
+    /// Serialize the database to a byte buffer without copying.
+    ///
+    /// This requires that database storage is contiguous in memory which might
+    /// be difficult to satisfy. One way to do so is if the current database is
+    /// [`deserialized`] from a previously serialized database (without having
+    /// been modified).
+    ///
+    /// The `name` parameter specifies the name of the database to serialize,
+    /// which is typically "main" for the main database.
+    ///
+    /// [`deserialized`]: Self::deserialize
+    ///
+    /// # Safety
+    ///
+    /// The returned buffer is valid until the next call to `serialize` or
+    /// `deserialize`, or until the connection is dropped. Modifying the
+    /// database in any way might invalidate the returned buffer, so it should
+    /// be used with care.
+    ///
+    /// For a safe variant of this method, see [`serialize`].
+    ///
+    /// [`serialize`]: Self::serialize
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Result};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE users (name TEXT, age INTEGER);
+    ///     INSERT INTO users VALUES ('Alice', 42);
+    ///     INSERT INTO users VALUES ('Bob', 72);
+    /// "#)?;
+    ///
+    /// let data = c.serialize(c"main")?;
+    /// assert!(!data.is_empty());
+    ///
+    /// let c2 = Connection::open_in_memory()?;
+    /// c2.deserialize(c"main", &data)?;
+    ///
+    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    ///     .iter::<(String, u32)>()
+    ///     .collect::<Result<Vec<_>>>()?;
+    ///
+    /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
+    ///
+    /// let data2 = unsafe { c2.serialize_no_copy(c"main")? };
+    /// assert_eq!(data, *data2);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    pub unsafe fn serialize_no_copy(&self, name: &CStr) -> Result<&[u8], Error> {
+        unsafe {
+            let mut len = MaybeUninit::uninit();
+
+            match ffi::sqlite3_serialize(
+                self.raw.as_ptr(),
+                name.as_ptr(),
+                len.as_mut_ptr(),
+                ffi::SQLITE_SERIALIZE_NOCOPY as u32,
+            ) {
+                ptr if ptr.is_null() => Err(Error::new(
+                    Code::MISUSE,
+                    "database is not contiguous and cannot be serialized without copying",
+                )),
+                ptr => {
+                    let len = len.assume_init();
+
+                    let Ok(len) = usize::try_from(len) else {
+                        return Err(Error::new(
+                            Code::ERROR,
+                            format_args!(
+                                "failed to serialize database, returned size {len} is non-sensical"
+                            ),
+                        ));
+                    };
+
+                    Ok(slice::from_raw_parts(ptr.cast(), len))
+                }
+            }
+        }
+    }
+
+    /// Deserialize a byte buffer into the database.
+    ///
+    /// The `name` parameter specifies the name of the database to deserialize
+    /// into, which is typically "main" for the main database.
+    ///
+    /// The `data` parameter is the byte buffer containing the serialized
+    /// database, which should be obtained from a previous call to `serialize`
+    /// or read from a file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Result};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE users (name TEXT, age INTEGER);
+    ///     INSERT INTO users VALUES ('Alice', 42);
+    ///     INSERT INTO users VALUES ('Bob', 72);
+    /// "#)?;
+    ///
+    /// let data = c.serialize(c"main")?;
+    /// assert!(!data.is_empty());
+    ///
+    /// let c2 = Connection::open_in_memory()?;
+    /// c2.deserialize(c"main", &data)?;
+    ///
+    /// let results = c2.prepare_default("SELECT name, age FROM users")?
+    ///     .iter::<(String, u32)>()
+    ///     .collect::<Result<Vec<_>>>()?;
+    ///
+    /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    pub fn deserialize(&self, name: &CStr, data: &[u8]) -> Result<()> {
+        unsafe {
+            sqlite3_try! {
+                self,
+                ffi::sqlite3_deserialize(
+                    self.raw.as_ptr(),
+                    name.as_ptr(),
+                    data.as_ptr().cast_mut(),
+                    data.len() as i64,
+                    data.len() as i64,
+                    0,
                 )
             };
         }

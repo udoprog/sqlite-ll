@@ -5,7 +5,7 @@ authors = [
     "John-John Tedro <udoprog@tedro.se>"
 ]
 edition = "2024"
-rust-version = "1.91"
+rust-version = "1.95"
 description = "Efficient interface to SQLite that doesn't get in your way"
 documentation = "https://docs.rs/sqll"
 readme = "README.md"

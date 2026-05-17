@@ -1,15 +1,11 @@
 #[cfg(feature = "alloc")]
 mod alloc;
 
-use core::ffi::c_int;
-
 use crate::bytes;
 use crate::ffi;
 use crate::utils::sqlite3_try;
 use crate::value::Kind;
-use crate::{
-    BIND_INDEX, Bind, Code, Error, FixedBlob, FixedText, Null, Result, Statement, Text, Value,
-};
+use crate::{Bind, Code, Error, FixedBlob, FixedText, Index, Null, Result, Statement, Text, Value};
 
 /// A type suitable for binding to a prepared statement.
 ///
@@ -28,9 +24,7 @@ pub trait BindValue {
     /// # Examples
     ///
     /// ```
-    /// use core::ffi::c_int;
-    ///
-    /// use sqll::{Bind, BindValue, Connection, Result, Statement, BIND_INDEX};
+    /// use sqll::{Bind, BindValue, Connection, Result, Statement, Index};
     ///
     /// let c = Connection::open_in_memory()?;
     ///
@@ -38,7 +32,7 @@ pub trait BindValue {
     ///
     /// impl BindValue for Id {
     ///     #[inline]
-    ///     fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    ///     fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
     ///         self.0.bind_value(stmt, index)
     ///     }
     /// }
@@ -46,7 +40,7 @@ pub trait BindValue {
     /// impl Bind for Id {
     ///     #[inline]
     ///     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-    ///         self.bind_value(stmt, BIND_INDEX)
+    ///         self.bind_value(stmt, Index::BIND)
     ///     }
     /// }
     ///
@@ -54,19 +48,19 @@ pub trait BindValue {
     ///     CREATE TABLE ids (id BLOB NOT NULL);
     /// "#)?;
     ///
-    /// let mut stmt = c.prepare("INSERT INTO ids (id) VALUES (?)")?;
+    /// let mut stmt = c.prepare_default("INSERT INTO ids (id) VALUES (?)")?;
     ///
     /// stmt.execute(Id(*b"abcdabcd"))?;
     /// # Ok::<_, sqll::Error>(())
     /// ```
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()>;
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()>;
 }
 
 impl<T> BindValue for &T
 where
     T: ?Sized + BindValue,
 {
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         (**self).bind_value(stmt, index)
     }
 }
@@ -76,7 +70,7 @@ where
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, Null, Result, BIND_INDEX};
+/// use sqll::{Connection, Null, Result, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -86,19 +80,19 @@ where
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, Null)?;
+/// stmt.bind_value(Index::BIND, Null)?;
 /// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::from("Alice"))]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for Null {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         unsafe {
             sqlite3_try! {
-                stmt, ffi::sqlite3_bind_null(stmt.as_ptr_mut(), index)
+                stmt, ffi::sqlite3_bind_null(stmt.as_ptr_mut(), index.raw())
             };
         }
 
@@ -121,7 +115,7 @@ impl BindValue for Null {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.bind(Null)?;
 /// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::from("Alice"))]);
@@ -130,7 +124,7 @@ impl BindValue for Null {
 impl Bind for Null {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -139,7 +133,7 @@ impl Bind for Null {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, Value, Result, BIND_INDEX};
+/// use sqll::{Connection, Value, Result, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -149,17 +143,17 @@ impl Bind for Null {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, None::<Value<'_>>)?;
+/// stmt.bind_value(Index::BIND, None::<Value<'_>>)?;
 /// assert_eq!(stmt.next::<Value<'_>>(), Ok(Some(Value::text("Alice"))));
 /// assert_eq!(stmt.next::<Value<'_>>(), Ok(None));
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for Value<'_> {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         match *self.kind() {
             Kind::Blob(value) => value.bind_value(stmt, index),
             Kind::Float(value) => value.bind_value(stmt, index),
@@ -184,7 +178,7 @@ impl BindValue for Value<'_> {
 ///     INSERT INTO users (name, age) VALUES ('Alice', NULL), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT name FROM users WHERE age IS ?")?;
+/// let mut stmt = c.prepare_default("SELECT name FROM users WHERE age IS ?")?;
 /// stmt.bind(None::<Value<'_>>)?;
 ///
 /// assert_eq!(stmt.next::<Value<'_>>(), Ok(Some(Value::text("Alice"))));
@@ -194,7 +188,7 @@ impl BindValue for Value<'_> {
 impl Bind for Value<'_> {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -203,7 +197,7 @@ impl Bind for Value<'_> {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -215,20 +209,20 @@ impl Bind for Value<'_> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, &b"Hello"[..])?;
+/// stmt.bind_value(Index::BIND, &b"Hello"[..])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, &b""[..])?;
+/// stmt.bind_value(Index::BIND, &b""[..])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for [u8] {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         let (ptr, len, dealloc) = bytes::alloc(self)?;
 
         unsafe {
@@ -236,7 +230,7 @@ impl BindValue for [u8] {
                 stmt,
                 ffi::sqlite3_bind_blob(
                     stmt.as_ptr_mut(),
-                    index,
+                    index.raw(),
                     ptr,
                     len,
                     dealloc,
@@ -265,7 +259,7 @@ impl BindValue for [u8] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(&b"Hello"[..])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -277,7 +271,7 @@ impl BindValue for [u8] {
 impl Bind for [u8] {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -286,7 +280,7 @@ impl Bind for [u8] {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, FixedBlob, BIND_INDEX};
+/// use sqll::{Connection, FixedBlob, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -298,20 +292,20 @@ impl Bind for [u8] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, FixedBlob::from(b"Hello"))?;
+/// stmt.bind_value(Index::BIND, FixedBlob::from(b"Hello"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, FixedBlob::from(b""))?;
+/// stmt.bind_value(Index::BIND, FixedBlob::from(b""))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl<const N: usize> BindValue for FixedBlob<N> {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         self.as_slice().bind_value(stmt, index)
     }
 }
@@ -333,7 +327,7 @@ impl<const N: usize> BindValue for FixedBlob<N> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.bind(FixedBlob::from(b"Hello"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -345,7 +339,7 @@ impl<const N: usize> BindValue for FixedBlob<N> {
 impl<const N: usize> Bind for FixedBlob<N> {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -354,7 +348,7 @@ impl<const N: usize> Bind for FixedBlob<N> {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -366,20 +360,20 @@ impl<const N: usize> Bind for FixedBlob<N> {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, b"Hello")?;
+/// stmt.bind_value(Index::BIND, b"Hello")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, b"")?;
+/// stmt.bind_value(Index::BIND, b"")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl<const N: usize> BindValue for [u8; N] {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         self.as_slice().bind_value(stmt, index)
     }
 }
@@ -401,7 +395,7 @@ impl<const N: usize> BindValue for [u8; N] {
 ///     INSERT INTO files (id, data) VALUES (2, X'');
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
+/// let mut stmt = c.prepare_default("SELECT id FROM files WHERE data = ?")?;
 /// stmt.bind(b"Hello")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 ///
@@ -412,7 +406,7 @@ impl<const N: usize> BindValue for [u8; N] {
 impl<const N: usize> Bind for [u8; N] {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -427,7 +421,7 @@ impl<const N: usize> Bind for [u8; N] {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -437,22 +431,22 @@ impl<const N: usize> Bind for [u8; N] {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, 2.0f64)?;
+/// stmt.bind_value(Index::BIND, 2.0f64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for f64 {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         unsafe {
             sqlite3_try! {
                 stmt,
                 ffi::sqlite3_bind_double(
                     stmt.as_ptr_mut(),
-                    index,
+                    index.raw(),
                     *self
                 )
             };
@@ -483,7 +477,7 @@ impl BindValue for f64 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2.0f64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
@@ -492,7 +486,7 @@ impl BindValue for f64 {
 impl Bind for f64 {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -504,7 +498,7 @@ impl Bind for f64 {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -514,22 +508,22 @@ impl Bind for f64 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, 2.0f32)?;
+/// stmt.bind_value(Index::BIND, 2.0f32)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for f32 {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         unsafe {
             sqlite3_try! {
                 stmt,
                 ffi::sqlite3_bind_double(
                     stmt.as_ptr_mut(),
-                    index,
+                    index.raw(),
                     *self as f64
                 )
             };
@@ -557,7 +551,7 @@ impl BindValue for f32 {
 ///     INSERT INTO measurements (value) VALUES (3.14), (2.71), (1.61);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2.0f32)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
@@ -566,7 +560,7 @@ impl BindValue for f32 {
 impl Bind for f32 {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -581,7 +575,7 @@ impl Bind for f32 {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -591,22 +585,22 @@ impl Bind for f32 {
 ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, 2i64)?;
+/// stmt.bind_value(Index::BIND, 2i64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for i64 {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         unsafe {
             sqlite3_try! {
                 stmt,
                 ffi::sqlite3_bind_int64(
                     stmt.as_ptr_mut(),
-                    index,
+                    index.raw(),
                     *self as ffi::sqlite3_int64
                 )
             };
@@ -637,7 +631,7 @@ impl BindValue for i64 {
 ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+/// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
 ///
 /// stmt.bind(2i64)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -646,7 +640,7 @@ impl BindValue for i64 {
 impl Bind for i64 {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -662,7 +656,7 @@ impl Bind for i64 {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -672,20 +666,20 @@ impl Bind for i64 {
 ///     INSERT INTO booleans (value) VALUES (TRUE), (FALSE), (FALSE);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM booleans WHERE value != ?")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM booleans WHERE value != ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, true)?;
+/// stmt.bind_value(Index::BIND, true)?;
 /// assert_eq!(stmt.iter::<bool>().collect::<Vec<_>>(), [Ok(false), Ok(false)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, false)?;
+/// stmt.bind_value(Index::BIND, false)?;
 /// assert_eq!(stmt.iter::<bool>().collect::<Vec<_>>(), [Ok(true)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for bool {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         i64::from(*self).bind_value(stmt, index)
     }
 }
@@ -702,7 +696,7 @@ impl BindValue for bool {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -712,7 +706,7 @@ impl BindValue for bool {
 ///     INSERT INTO booleans (value) VALUES (TRUE), (FALSE), (FALSE);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT value FROM booleans WHERE value != ?")?;
+/// let mut stmt = c.prepare_default("SELECT value FROM booleans WHERE value != ?")?;
 ///
 /// stmt.bind(true)?;
 /// assert_eq!(stmt.iter::<bool>().collect::<Vec<_>>(), [Ok(false), Ok(false)]);
@@ -724,7 +718,7 @@ impl BindValue for bool {
 impl Bind for bool {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -745,14 +739,14 @@ macro_rules! lossless {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         #[doc = concat!("stmt.bind(2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
         /// # Ok::<_, sqll::Error>(())
         /// ```
         impl BindValue for $ty {
             #[inline]
-            fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+            fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
                 let value = *self as i64;
                 value.bind_value(stmt, index)
             }
@@ -761,7 +755,7 @@ macro_rules! lossless {
         impl Bind for $ty {
             #[inline]
             fn bind(&self, stmt: &mut Statement) -> Result<()> {
-                self.bind_value(stmt, BIND_INDEX)
+                self.bind_value(stmt, Index::BIND)
             }
         }
     };
@@ -777,7 +771,7 @@ macro_rules! lossy {
         /// cannot be represented by a [`i64`].
         ///
         /// ```
-        /// use sqll::{Connection, Code, BIND_INDEX};
+        /// use sqll::{Connection, Code, Index};
         ///
         /// let c = Connection::open_in_memory()?;
         ///
@@ -787,8 +781,8 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
-        #[doc = concat!("let e = stmt.bind_value(BIND_INDEX, ", stringify!($ty), "::MAX).unwrap_err();")]
+        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        #[doc = concat!("let e = stmt.bind_value(Index::BIND, ", stringify!($ty), "::MAX).unwrap_err();")]
         /// assert_eq!(e.code(), sqll::Code::MISMATCH);
         /// # Ok::<_, sqll::Error>(())
         /// ```
@@ -796,7 +790,7 @@ macro_rules! lossy {
         /// # Examples
         ///
         /// ```
-        /// use sqll::{Connection, BIND_INDEX};
+        /// use sqll::{Connection, Index};
         ///
         /// let c = Connection::open_in_memory()?;
         ///
@@ -806,15 +800,15 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
-        #[doc = concat!("stmt.bind_value(BIND_INDEX, 2", stringify!($ty), ")?;")]
+        #[doc = concat!("stmt.bind_value(Index::BIND, 2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
         /// # Ok::<_, sqll::Error>(())
         /// ```
         impl BindValue for $ty {
             #[inline]
-            fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+            fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
                 let Ok(value) = i64::try_from(*self) else {
                     return Err(Error::new(Code::MISMATCH, format_args!($conversion, *self)));
                 };
@@ -841,7 +835,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
         #[doc = concat!("let e = stmt.bind(", stringify!($ty), "::MAX).unwrap_err();")]
         /// assert_eq!(e.code(), sqll::Code::MISMATCH);
@@ -861,7 +855,7 @@ macro_rules! lossy {
         ///     INSERT INTO measurements (value) VALUES (3), (2), (1);
         /// "#)?;
         ///
-        /// let mut stmt = c.prepare("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
+        /// let mut stmt = c.prepare_default("SELECT COUNT(*) FROM measurements WHERE value > ?")?;
         ///
         #[doc = concat!("stmt.bind(2", stringify!($ty), ")?;")]
         /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
@@ -870,7 +864,7 @@ macro_rules! lossy {
         impl Bind for $ty {
             #[inline]
             fn bind(&self, stmt: &mut Statement) -> Result<()> {
-                self.bind_value(stmt, BIND_INDEX)
+                self.bind_value(stmt, Index::BIND)
             }
         }
     };
@@ -885,13 +879,23 @@ lossless!(u16);
 lossless!(u32);
 lossy!(u64, "value {} cannot be converted to sqlite integer");
 lossy!(u128, "value {} cannot be converted to sqlite integer");
+lossy!(usize, "value {} cannot be converted to sqlite integer");
+
+cfg_select! {
+    any(target_pointer_width = "32", target_pointer_width = "64") => {
+        lossless!(isize);
+    }
+    _ => {
+        lossy!(isize, "value {} cannot be converted to sqlite integer");
+    }
+}
 
 /// [`BindValue`] implementation for [`str`] slices.
 ///
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, Text, BIND_INDEX};
+/// use sqll::{Connection, Text, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -901,14 +905,14 @@ lossy!(u128, "value {} cannot be converted to sqlite integer");
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, "Alice")?;
+/// stmt.bind_value(Index::BIND, "Alice")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, "")?;
+/// stmt.bind_value(Index::BIND, "")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(25)]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -916,7 +920,7 @@ lossy!(u128, "value {} cannot be converted to sqlite integer");
 /// Inserting an empty string:
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -924,16 +928,16 @@ lossy!(u128, "value {} cannot be converted to sqlite integer");
 ///     CREATE TABLE strings (string TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO strings (string) VALUES (?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO strings (string) VALUES (?)")?;
 /// stmt.execute((String::new(),))?;
 ///
-/// let mut stmt = c.prepare("SELECT string FROM strings")?;
+/// let mut stmt = c.prepare_default("SELECT string FROM strings")?;
 /// assert_eq!(stmt.iter::<String>().collect::<Vec<_>>(), [Ok(String::new())]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for str {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         Text::new(self).bind_value(stmt, index)
     }
 }
@@ -953,7 +957,7 @@ impl BindValue for str {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind("Alice")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -965,7 +969,7 @@ impl BindValue for str {
 impl Bind for str {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -974,7 +978,7 @@ impl Bind for str {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, Text, BIND_INDEX};
+/// use sqll::{Connection, Text, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -984,24 +988,24 @@ impl Bind for str {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, Text::new(b"Alice"))?;
+/// stmt.bind_value(Index::BIND, Text::new(b"Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, Text::new(b""))?;
+/// stmt.bind_value(Index::BIND, Text::new(b""))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(25)]);
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, b"")?;
+/// stmt.bind_value(Index::BIND, b"")?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), []);
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for Text {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         let (ptr, len, dealloc) = bytes::alloc(self.as_bytes())?;
 
         unsafe {
@@ -1009,7 +1013,7 @@ impl BindValue for Text {
                 stmt,
                 ffi::sqlite3_bind_text(
                     stmt.as_ptr_mut(),
-                    index,
+                    index.raw(),
                     ptr.cast(),
                     len,
                     dealloc,
@@ -1036,7 +1040,7 @@ impl BindValue for Text {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30), ('', 25);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(Text::new(b"Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -1051,7 +1055,7 @@ impl BindValue for Text {
 impl Bind for Text {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -1060,7 +1064,7 @@ impl Bind for Text {
 /// # Examples
 ///
 /// ```
-/// use sqll::{Connection, FixedText, BIND_INDEX};
+/// use sqll::{Connection, FixedText, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -1070,15 +1074,15 @@ impl Bind for Text {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
-/// stmt.bind_value(BIND_INDEX, FixedText::<5>::try_from("Alice")?)?;
+/// stmt.bind_value(Index::BIND, FixedText::<5>::try_from("Alice")?)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 impl<const N: usize> BindValue for FixedText<N> {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         self.as_text().bind_value(stmt, index)
     }
 }
@@ -1098,7 +1102,7 @@ impl<const N: usize> BindValue for FixedText<N> {
 ///     INSERT INTO users (name, age) VALUES ('Alice', 42), ('Bob', 30);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
+/// let mut stmt = c.prepare_default("SELECT age FROM users WHERE name = ?")?;
 ///
 /// stmt.bind(FixedText::<5>::try_from("Alice")?)?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -1107,7 +1111,7 @@ impl<const N: usize> BindValue for FixedText<N> {
 impl<const N: usize> Bind for FixedText<N> {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }
 
@@ -1121,7 +1125,7 @@ impl<const N: usize> Bind for FixedText<N> {
 /// Inserting values:
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let mut c = Connection::open_in_memory()?;
 ///
@@ -1129,22 +1133,22 @@ impl<const N: usize> Bind for FixedText<N> {
 ///     CREATE TABLE users (id INTEGER, name TEXT, age REAL, photo BLOB, email TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, None::<i64>)?;
-/// stmt.bind_value(BIND_INDEX + 1, None::<&str>)?;
-/// stmt.bind_value(BIND_INDEX + 2, None::<f64>)?;
-/// stmt.bind_value(BIND_INDEX + 3, None::<&[u8]>)?;
-/// stmt.bind_value(BIND_INDEX + 4, None::<&str>)?;
+/// stmt.bind_value(Index::BIND, None::<i64>)?;
+/// stmt.bind_value(Index::BIND + 1, None::<&str>)?;
+/// stmt.bind_value(Index::BIND + 2, None::<f64>)?;
+/// stmt.bind_value(Index::BIND + 3, None::<&[u8]>)?;
+/// stmt.bind_value(Index::BIND + 4, None::<&str>)?;
 /// assert!(stmt.step()?.is_done());
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, Some(2i64))?;
-/// stmt.bind_value(BIND_INDEX + 1, Some(b"Bob"))?;
-/// stmt.bind_value(BIND_INDEX + 2, Some(69.42))?;
-/// stmt.bind_value(BIND_INDEX + 3, Some(&[0x69u8, 0x42u8][..]))?;
-/// stmt.bind_value(BIND_INDEX + 4, Some("Bob"))?;
+/// stmt.bind_value(Index::BIND, Some(2i64))?;
+/// stmt.bind_value(Index::BIND + 1, Some(b"Bob"))?;
+/// stmt.bind_value(Index::BIND + 2, Some(69.42))?;
+/// stmt.bind_value(Index::BIND + 3, Some(&[0x69u8, 0x42u8][..]))?;
+/// stmt.bind_value(Index::BIND + 4, Some("Bob"))?;
 /// assert!(stmt.step()?.is_done());
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -1152,7 +1156,7 @@ impl<const N: usize> Bind for FixedText<N> {
 /// Reading back values:
 ///
 /// ```
-/// use sqll::{Connection, BIND_INDEX};
+/// use sqll::{Connection, Index};
 ///
 /// let c = Connection::open_in_memory()?;
 ///
@@ -1160,19 +1164,19 @@ impl<const N: usize> Bind for FixedText<N> {
 ///     CREATE TABLE users (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO users (name, age) VALUES (?, ?)")?;
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, "Alice")?;
-/// stmt.bind_value(BIND_INDEX + 1, None::<i64>)?;
+/// stmt.bind_value(Index::BIND, "Alice")?;
+/// stmt.bind_value(Index::BIND + 1, None::<i64>)?;
 /// assert!(stmt.step()?.is_done());
 ///
 /// stmt.reset()?;
-/// stmt.bind_value(BIND_INDEX, "Bob")?;
-/// stmt.bind_value(BIND_INDEX + 1, Some(30i64))?;
+/// stmt.bind_value(Index::BIND, "Bob")?;
+/// stmt.bind_value(Index::BIND + 1, Some(30i64))?;
 /// assert!(stmt.step()?.is_done());
 ///
-/// let mut it = c.prepare("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
+/// let mut it = c.prepare_default("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
 /// assert_eq!(it.collect::<Vec<_>>(), [Ok((String::from("Alice"), None)), Ok((String::from("Bob"), Some(30)))]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -1181,7 +1185,7 @@ where
     T: BindValue,
 {
     #[inline]
-    fn bind_value(&self, stmt: &mut Statement, index: c_int) -> Result<()> {
+    fn bind_value(&self, stmt: &mut Statement, index: Index) -> Result<()> {
         match self {
             Some(inner) => inner.bind_value(stmt, index),
             None => Null.bind_value(stmt, index),
@@ -1207,7 +1211,7 @@ where
 ///     CREATE TABLE users (id INTEGER, name TEXT, age REAL, photo BLOB, email TEXT);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
 /// stmt.execute((None::<i64>, None::<&str>, None::<f64>, None::<&[u8]>, None::<&str>))?;
 /// stmt.execute((Some(2i64), Some(b"Bob"), Some(69.42), Some(&[0x69u8, 0x42u8][..]), Some("Bob")))?;
 /// # Ok::<_, sqll::Error>(())
@@ -1224,11 +1228,11 @@ where
 ///     CREATE TABLE users (name TEXT, age INTEGER);
 /// "#)?;
 ///
-/// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
+/// let mut stmt = c.prepare_default("INSERT INTO users (name, age) VALUES (?, ?)")?;
 /// stmt.execute(("Alice", None::<i64>))?;
 /// stmt.execute(("Bob", Some(30i64)))?;
 ///
-/// let mut it = c.prepare("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
+/// let mut it = c.prepare_default("SELECT name, age FROM users")?.into_iter::<(String, Option<i64>)>();
 /// assert_eq!(it.collect::<Vec<_>>(), [Ok((String::from("Alice"), None)), Ok((String::from("Bob"), Some(30)))]);
 /// # Ok::<_, sqll::Error>(())
 /// ```
@@ -1238,6 +1242,6 @@ where
 {
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
-        self.bind_value(stmt, BIND_INDEX)
+        self.bind_value(stmt, Index::BIND)
     }
 }

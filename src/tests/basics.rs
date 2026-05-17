@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use anyhow::Result;
 
-use crate::{Connection, Null, Text, Value};
+use crate::{Connection, Index, Null, Text, Value};
 
 use super::data;
 
@@ -38,13 +38,13 @@ fn statement_bind() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
 
-    let mut stmt = c.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
+    let mut stmt = c.prepare_default("INSERT INTO users VALUES (?, ?, ?, ?, ?)")?;
 
-    stmt.bind_value(1, 2i64)?;
-    stmt.bind_value(2, "Bob")?;
-    stmt.bind_value(3, 69.42)?;
-    stmt.bind_value(4, &[0x69u8, 0x42u8][..])?;
-    stmt.bind_value(5, Null)?;
+    stmt.bind_value(Index::BIND, 2i64)?;
+    stmt.bind_value(Index::BIND + 1, "Bob")?;
+    stmt.bind_value(Index::BIND + 2, 69.42)?;
+    stmt.bind_value(Index::BIND + 3, &[0x69u8, 0x42u8][..])?;
+    stmt.bind_value(Index::BIND + 4, Null)?;
 
     assert!(stmt.step()?.is_done());
     Ok(())
@@ -55,7 +55,7 @@ fn statement_column_name() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
 
-    let stmt = c.prepare("SELECT id, name, age, photo AS user_photo FROM users")?;
+    let stmt = c.prepare_default("SELECT id, name, age, photo AS user_photo FROM users")?;
 
     let names = stmt.column_names().collect::<Vec<_>>();
     assert_eq!(names, ["id", "name", "age", "user_photo"]);
@@ -69,7 +69,7 @@ fn statement_parameter_index() -> Result<()> {
     data::users(&mut c)?;
 
     let statement = "INSERT INTO users VALUES (:id, :name, :age, :photo, :email)";
-    let mut stmt = c.prepare(statement)?;
+    let mut stmt = c.prepare_default(statement)?;
 
     stmt.bind_value(stmt.bind_parameter_index(c":id").unwrap(), 2)?;
     stmt.bind_value(stmt.bind_parameter_index(c":name").unwrap(), "Bob")?;
@@ -89,7 +89,7 @@ fn statement_read() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
 
-    let mut stmt = c.prepare("SELECT * FROM users")?;
+    let mut stmt = c.prepare_default("SELECT * FROM users")?;
 
     assert!(stmt.step()?.is_row());
     assert_eq!(stmt.column::<i64>(0)?, 1);
@@ -106,7 +106,7 @@ fn statement_read_with_nullable() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
 
-    let mut stmt = c.prepare("SELECT * FROM users")?;
+    let mut stmt = c.prepare_default("SELECT * FROM users")?;
 
     assert!(stmt.step()?.is_row());
     assert_eq!(stmt.column::<Option<i64>>(0)?, Some(1));
@@ -126,7 +126,7 @@ fn statement_wildcard() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::english(&mut c)?;
 
-    let mut stmt = c.prepare("SELECT value FROM english WHERE value LIKE '%type'")?;
+    let mut stmt = c.prepare_default("SELECT value FROM english WHERE value LIKE '%type'")?;
 
     let mut count = 0;
 
@@ -143,9 +143,9 @@ fn statement_wildcard_with_binding() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::english(&mut c)?;
 
-    let mut stmt = c.prepare("SELECT value FROM english WHERE value LIKE ?")?;
+    let mut stmt = c.prepare_default("SELECT value FROM english WHERE value LIKE ?")?;
 
-    stmt.bind_value(1, "%type")?;
+    stmt.bind_value(Index::BIND, "%type")?;
 
     let mut count = 0;
 
@@ -162,7 +162,7 @@ fn test_dropped_connection() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
 
-    let stmt = c.prepare("SELECT id, name, age, photo AS user_photo FROM users")?;
+    let stmt = c.prepare_default("SELECT id, name, age, photo AS user_photo FROM users")?;
     drop(c);
 
     let names = stmt.column_names().collect::<Vec<_>>();
