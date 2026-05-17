@@ -1,7 +1,7 @@
 use std::fs;
 
 use anyhow::Result;
-use sqll::Connection;
+use sqll::{Connection, OwnedBytes};
 use tempfile::tempdir;
 
 #[test]
@@ -21,11 +21,11 @@ fn deserialize_file() -> Result<()> {
         )?;
     }
 
-    let data = fs::read(path)?;
+    let data = OwnedBytes::from_slice(fs::read(path)?)?;
     assert!(!data.is_empty());
 
     let c = Connection::open_in_memory()?;
-    c.deserialize(c"main", &data)?;
+    c.deserialize(c"main", data)?;
 
     let rows = c
         .prepare("SELECT name, age FROM users ORDER BY name")?

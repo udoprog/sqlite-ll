@@ -3,7 +3,7 @@ use core::ffi::CStr;
 use core::ffi::c_void;
 use core::ffi::{c_int, c_uint};
 use core::fmt;
-use core::mem::MaybeUninit;
+use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{BitOr, Deref, DerefMut};
 use core::ptr::{NonNull, null_mut};
 use core::slice;
@@ -965,7 +965,7 @@ impl Connection {
     /// dropped.
     ///
     /// The `name` parameter specifies the name of the database to serialize,
-    /// which is typically "main" for the main database.
+    /// which is typically `c"main"` for the main database.
     ///
     /// # Examples
     ///
@@ -984,7 +984,7 @@ impl Connection {
     /// assert!(!data.is_empty());
     ///
     /// let c2 = Connection::open_in_memory()?;
-    /// c2.deserialize(c"main", &data)?;
+    /// c2.deserialize(c"main", data)?;
     ///
     /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
@@ -1026,13 +1026,13 @@ impl Connection {
     ///
     /// This requires that database storage is contiguous in memory which might
     /// be difficult to satisfy. One way to do so is if the current database is
-    /// [`deserialized`] from a previously serialized database (without having
+    /// [`deserialize`] from a previously serialized database (without having
     /// been modified).
     ///
     /// The `name` parameter specifies the name of the database to serialize,
-    /// which is typically "main" for the main database.
+    /// which is typically `c"main"` for the main database.
     ///
-    /// [`deserialized`]: Self::deserialize
+    /// [`deserialize`]: Self::deserialize
     ///
     /// # Safety
     ///
@@ -1062,7 +1062,7 @@ impl Connection {
     /// assert!(!data.is_empty());
     ///
     /// let c2 = Connection::open_in_memory()?;
-    /// c2.deserialize(c"main", &data)?;
+    /// c2.deserialize(c"main", data.clone())?;
     ///
     /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
@@ -1106,10 +1106,11 @@ impl Connection {
         }
     }
 
-    /// Deserialize a byte buffer into the database.
+    /// Deserialize and take ownership of the specified byte buffer into the
+    /// database.
     ///
     /// The `name` parameter specifies the name of the database to deserialize
-    /// into, which is typically "main" for the main database.
+    /// into, which is typically `c"main"` for the main database.
     ///
     /// The `data` parameter is the byte buffer containing the serialized
     /// database, which should be obtained from a previous call to `serialize`
@@ -1132,7 +1133,7 @@ impl Connection {
     /// assert!(!data.is_empty());
     ///
     /// let c2 = Connection::open_in_memory()?;
-    /// c2.deserialize(c"main", &data)?;
+    /// c2.deserialize(c"main", data)?;
     ///
     /// let results = c2.prepare("SELECT name, age FROM users")?
     ///     .iter::<(String, u32)>()
@@ -1141,7 +1142,23 @@ impl Connection {
     /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
-    pub fn deserialize(&self, name: &CStr, data: &[u8]) -> Result<()> {
+    pub fn deserialize(&self, name: &CStr, data: OwnedBytes) -> Result<()> {
+        let data = ManuallyDrop::new(data);
+
+        let Ok(len) = i64::try_from(data.len()) else {
+            return Err(Error::new(
+                Code::MISUSE,
+                "length of owned buffer is too large",
+            ));
+        };
+
+        let Ok(capacity) = i64::try_from(data.capacity()) else {
+            return Err(Error::new(
+                Code::MISUSE,
+                "capacity of owned buffer is too large",
+            ));
+        };
+
         unsafe {
             sqlite3_try! {
                 self,
@@ -1149,9 +1166,9 @@ impl Connection {
                     self.raw.as_ptr(),
                     name.as_ptr(),
                     data.as_ptr().cast_mut(),
-                    data.len() as i64,
-                    data.len() as i64,
-                    0,
+                    len,
+                    capacity,
+                    (ffi::SQLITE_DESERIALIZE_FREEONCLOSE | ffi::SQLITE_DESERIALIZE_RESIZEABLE) as u32,
                 )
             };
         }
