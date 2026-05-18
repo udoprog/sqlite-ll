@@ -76,6 +76,12 @@ unsafe extern "C" {
     pub fn sqlite3_malloc(arg1: ::core::ffi::c_int) -> *mut ::core::ffi::c_void;
 }
 unsafe extern "C" {
+    pub fn sqlite3_realloc(
+        arg1: *mut ::core::ffi::c_void,
+        arg2: ::core::ffi::c_int,
+    ) -> *mut ::core::ffi::c_void;
+}
+unsafe extern "C" {
     pub fn sqlite3_free(arg1: *mut ::core::ffi::c_void);
 }
 unsafe extern "C" {

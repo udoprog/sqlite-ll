@@ -21,7 +21,10 @@ fn deserialize_file() -> Result<()> {
         )?;
     }
 
-    let data = OwnedBytes::from_slice(fs::read(path)?)?;
+    let bytes = fs::read(path)?;
+
+    let mut data = OwnedBytes::new();
+    data.extend_from_slice(&bytes)?;
     assert!(!data.is_empty());
 
     let c = Connection::open_in_memory()?;

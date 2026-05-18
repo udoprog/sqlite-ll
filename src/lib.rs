@@ -287,6 +287,7 @@ mod index;
 mod open_options;
 #[cfg(feature = "alloc")]
 mod owned;
+#[cfg(feature = "alloc")]
 mod owned_bytes;
 mod row;
 mod statement;
@@ -322,6 +323,8 @@ pub use self::index::Index;
 #[doc(inline)]
 pub use self::open_options::OpenOptions;
 #[doc(inline)]
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, cfg(feature = "alloc"))]
 pub use self::owned_bytes::OwnedBytes;
 #[doc(inline)]
 pub use self::row::Row;

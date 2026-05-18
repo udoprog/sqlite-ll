@@ -1,6 +1,8 @@
 use core::alloc::Layout;
 use core::ptr::NonNull;
 
+use alloc::alloc;
+
 use crate::{Code, Error, Result};
 
 /// An owned pointer with drop glue.
@@ -13,17 +15,17 @@ pub(crate) struct Owned {
 
 impl Owned {
     pub(crate) fn new<T>(value: T) -> Result<Self> {
-        unsafe fn drop_glue<F>(ptr: NonNull<()>) {
-            unsafe {
-                let layout = Layout::new::<F>();
-                alloc::alloc::dealloc(ptr.as_ptr().cast(), layout);
-            }
-        }
-
         let layout = Layout::new::<T>();
 
+        if layout.size() == 0 {
+            return Ok(Self {
+                ptr: NonNull::dangling(),
+                drop: zero_sized_drop_glue::<T>,
+            });
+        }
+
         let ptr = unsafe {
-            let ptr = alloc::alloc::alloc(layout);
+            let ptr = alloc::alloc(layout);
 
             if ptr.is_null() {
                 return Err(Error::new(Code::NOMEM, "allocation failed"));
@@ -53,3 +55,12 @@ impl Drop for Owned {
         }
     }
 }
+
+unsafe fn drop_glue<F>(ptr: NonNull<()>) {
+    unsafe {
+        let layout = Layout::new::<F>();
+        alloc::dealloc(ptr.as_ptr().cast(), layout);
+    }
+}
+
+unsafe fn zero_sized_drop_glue<T>(_: NonNull<()>) {}

@@ -23,14 +23,11 @@ pub struct Error {
 impl Error {
     /// Construct a new error from the specified code and message.
     #[inline]
-    pub fn new(
-        code: Code,
-        #[cfg_attr(not(feature = "alloc"), allow(unused_variables))] message: impl fmt::Display,
-    ) -> Self {
+    pub fn new(code: Code, _message: impl fmt::Display) -> Self {
         Self {
             code,
             #[cfg(feature = "alloc")]
-            message: format!("{message}"),
+            message: format!("{_message}"),
         }
     }
 

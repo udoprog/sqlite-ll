@@ -3,7 +3,9 @@ use core::ffi::CStr;
 use core::ffi::c_void;
 use core::ffi::{c_int, c_uint};
 use core::fmt;
-use core::mem::{ManuallyDrop, MaybeUninit};
+#[cfg(feature = "alloc")]
+use core::mem::ManuallyDrop;
+use core::mem::MaybeUninit;
 use core::ops::{BitOr, Deref, DerefMut};
 use core::ptr::{NonNull, null_mut};
 use core::slice;
@@ -11,13 +13,13 @@ use core::slice;
 #[cfg(feature = "std")]
 use std::path::Path;
 
+#[cfg(feature = "alloc")]
+use crate::OwnedBytes;
 use crate::ffi;
 #[cfg(feature = "alloc")]
 use crate::owned::Owned;
 use crate::utils::{c_to_error_text, sqlite3_try};
-use crate::{
-    Code, DatabaseNotFound, Error, NotThreadSafe, OpenOptions, OwnedBytes, Result, Statement, Text,
-};
+use crate::{Code, DatabaseNotFound, Error, NotThreadSafe, OpenOptions, Result, Statement, Text};
 
 /// A collection of flags use to prepare a statement.
 pub struct Prepare(c_uint);
@@ -993,6 +995,8 @@ impl Connection {
     /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(docsrs, cfg(feature = "alloc"))]
     pub fn serialize(&self, name: &CStr) -> Result<OwnedBytes, Error> {
         unsafe {
             let mut len = MaybeUninit::uninit();
@@ -1142,6 +1146,8 @@ impl Connection {
     /// assert_eq!(results, [("Alice".to_string(), 42), ("Bob".to_string(), 72)]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(docsrs, cfg(feature = "alloc"))]
     pub fn deserialize(&self, name: &CStr, data: OwnedBytes) -> Result<()> {
         let data = ManuallyDrop::new(data);
 
