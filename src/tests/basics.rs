@@ -158,6 +158,24 @@ fn statement_wildcard_with_binding() -> Result<()> {
 }
 
 #[test]
+fn statement_limit_binding() -> Result<()> {
+    let mut c = Connection::open_in_memory()?;
+    data::english(&mut c)?;
+
+    let mut stmt = c.prepare("SELECT value AS value2 FROM english WHERE value LIKE ? LIMIT ?")?;
+    stmt.bind(("%type", 3))?;
+
+    let mut values = Vec::<String>::new();
+
+    while let Some(value) = stmt.next()? {
+        values.push(value);
+    }
+
+    assert_eq!(values, ["cerotype", "metatype", "ozotype"]);
+    Ok(())
+}
+
+#[test]
 fn test_dropped_connection() -> Result<()> {
     let mut c = Connection::open_in_memory()?;
     data::users(&mut c)?;
