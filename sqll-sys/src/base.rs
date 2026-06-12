@@ -113,6 +113,9 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn sqlite3_stmt_readonly(pStmt: *mut sqlite3_stmt) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn sqlite3_bind_blob(
         arg1: *mut sqlite3_stmt,
         arg2: ::core::ffi::c_int,

@@ -270,7 +270,8 @@ async fn entry(opts: &Opts) -> Result<()> {
             .allowlist_item("sqlite3_bind_parameter_(index|name)")
             .allowlist_item("sqlite3_column_(name|type|count|bytes|text|double|int64|null|blob)")
             .allowlist_item("sqlite3_bind_(bytes|text|double|int64|null|blob)")
-            .allowlist_item("sqlite3_(malloc|free|realloc)");
+            .allowlist_item("sqlite3_(malloc|free|realloc)")
+            .allowlist_item("sqlite3_stmt_readonly");
     }
 
     builder

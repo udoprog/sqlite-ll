@@ -416,20 +416,23 @@ impl Statement {
     /// Get and read the next row from the statement using the [`Row`]
     /// trait.
     ///
-    /// The [`Row`] trait is a convenience trait which is usually
-    /// implemented using the [`Row` derive].
+    /// The [`Row`] trait is a convenience trait which is usually implemented
+    /// using the [`Row` derive].
     ///
-    /// Returns `None` when there are no more rows.
+    /// Returns `None` when there are no more rows, at this point [`step`] is
+    /// guaranteed to have returned [`State::Done`].
     ///
     /// This is a higher level API than `step` and is less prone to misuse.
     /// Misuse never leads to corrupted data or undefined behavior, only
     /// surprising behavior such as NULL values being auto-converted (see
-    /// [`Statement::step`]).
+    /// [`step`]).
     ///
     /// Note that since this borrows from a mutable reference, it is *not*
     /// possible to decode multiple rows that borrow from the statement
     /// simultaneously. This is intentional since the state of the row is stored
     /// in the [`Statement`] from which it is returned.
+    ///
+    /// [`step`]: Self::step
     ///
     /// ```compile_fail
     /// use sqll::{Connection, Row};
@@ -510,6 +513,62 @@ impl Statement {
         }
     }
 
+    /// Complete the current statement by calling `step` until it reports
+    /// [`State::Done`], then return the first row returned.
+    ///
+    /// Before calling this method, the statement should be reset either by
+    /// calling [`reset`] or [`bind`] if the statement takes arguments.
+    ///
+    /// This method cannot borrow from the current statement because it needs to
+    /// step until completion which invalidates any values borrowed from the
+    /// current statement.
+    ///
+    /// If you want to manipulate borrowed data you can use [`next`] and make
+    /// sure to continue calling it until it returns `None`.
+    ///
+    /// If you don't care about data being returned, use [`execute`] instead.
+    ///
+    /// [`bind`]: Self::bind
+    /// [`execute`]: Self::execute
+    /// [`next`]: Self::next
+    /// [`reset`]: Self::reset
+    ///
+    /// # Errors
+    ///
+    /// This method errors if the statement returns no rows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Row};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///    CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER);
+    /// "#)?;
+    ///
+    /// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES ('Alice', 72) RETURNING id")?;
+    /// stmt.reset()?;
+    ///
+    /// let id = stmt.first::<i64>()?;
+    /// assert_eq!(id, 1);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    #[inline]
+    pub fn first<T>(&mut self) -> Result<T>
+    where
+        T: for<'stmt> Row<'stmt>,
+    {
+        let Some(value) = self.next::<T>()? else {
+            return Err(Error::new(Code::DONE, "Expected at least one row of data"));
+        };
+
+        while !self.step()?.is_done() {}
+
+        Ok(value)
+    }
+
     /// Step the statement.
     ///
     /// This is necessary in order to produce rows from a statement. It must be
@@ -520,11 +579,17 @@ impl Statement {
     /// read from the statement. When step returns [`State::Done`] no more rows
     /// are available.
     ///
-    /// For a less error-prone alternative, consider using [`Statement::next`].
+    /// Note that you must call `step` until completion for write operations to
+    /// be persisted with the guarantees provided by the current configured
+    /// persistence mode. For read operations this is not necessary.
+    ///
+    /// For a less error-prone alternative, consider using [`next`].
     ///
     /// Trying to read data from a statement which has not been stepped will
     /// always result in a NULL value being read which will always result in an
     /// error.
+    ///
+    /// [`next`]: Self::next
     ///
     /// ```
     /// use sqll::{Connection, Code};
@@ -1073,21 +1138,62 @@ impl Statement {
     ///     CREATE TABLE users (name TEXT, age INTEGER);
     /// "#)?;
     ///
-    /// let stmt = c.prepare("SELECT * FROM users;")?;
+    /// let stmt = c.prepare("SELECT name, age, age * 2, age / 2 as age_divided FROM users;")?;
     ///
     /// let cols = stmt.columns().collect::<Vec<_>>();
-    /// assert_eq!(cols, [Column::from_raw(0), Column::from_raw(1)]);
-    /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["name", "age"]);
+    /// assert_eq!(cols, [Column::from_raw(0), Column::from_raw(1), Column::from_raw(2), Column::from_raw(3)]);
+    /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["name", "age", "age * 2", "age_divided"]);
     ///
     /// let cols = stmt.columns().rev().collect::<Vec<_>>();
-    /// assert_eq!(cols, [Column::from_raw(1), Column::from_raw(0)]);
-    /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["age", "name"]);
+    /// assert_eq!(cols, [Column::from_raw(3), Column::from_raw(2), Column::from_raw(1), Column::from_raw(0)]);
+    /// assert_eq!(cols.iter().flat_map(|i| stmt.column_name(*i)).collect::<Vec<_>>(), ["age_divided", "age * 2", "age", "name"]);
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
     pub fn column_name(&self, column: impl Into<Column>) -> Option<&Text> {
         let column = column.into();
         unsafe { c_to_text(ffi::sqlite3_column_name(self.raw.as_ptr(), column.raw())) }
+    }
+
+    /// Return whether the statement is read-only.
+    ///
+    /// A read-only statement is a statement that does not count as a write
+    /// operation in the database.
+    ///
+    /// Multiple connections to the same database file can use read-only
+    /// statements simultaneously without blocking each other.
+    ///
+    /// If we mix read and write statements, one is expected to block the other
+    /// with a [`Code::BUSY`].
+    ///
+    /// Note that application-defined functions can cause database writes
+    /// despite the statement being considered read-only:
+    ///
+    /// ```text
+    /// SELECT eval('DELETE FROM t1') FROM t2;
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::{Connection, Code};
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE users (name TEXT, age INTEGER);
+    /// "#)?;
+    ///
+    /// let read_only_stmt = c.prepare("SELECT * FROM users;")?;
+    /// let write_stmt = c.prepare("INSERT INTO users VALUES ('Alice', 42);")?;
+    ///
+    /// assert!(read_only_stmt.is_read_only());
+    /// assert!(!write_stmt.is_read_only());
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        unsafe { ffi::sqlite3_stmt_readonly(self.raw.as_ptr()) != 0 }
     }
 
     /// Return an iterator of column indexes.
