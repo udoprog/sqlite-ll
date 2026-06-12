@@ -35,6 +35,8 @@ use crate::{BindValue, Error, Statement};
 ///
 /// assert_eq!(stmt.next::<(String, u32)>()?, Some(("Bob".to_string(), 72)));
 /// assert_eq!(stmt.next::<(String, u32)>()?, None);
+///
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub trait Bind {

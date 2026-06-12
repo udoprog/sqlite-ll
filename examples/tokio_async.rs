@@ -33,6 +33,7 @@ fn setup_database() -> Result<Database> {
         .prepare_with("SELECT age FROM users ORDER BY age")
         .persistent()
         .build()?;
+
     let update = c
         .prepare_with("UPDATE users SET age = age + ?")
         .persistent()
@@ -63,8 +64,14 @@ async fn main() -> Result<()> {
 
             async move {
                 let mut stmts = db.stmts.lock_owned().await;
-                let task = task::spawn_blocking(move || stmts.update.execute(2));
-                Ok::<_, anyhow::Error>(task.await??)
+
+                let task = task::spawn_blocking(move || {
+                    stmts.update.execute(2)?;
+                    stmts.update.reset()?;
+                    Ok::<_, anyhow::Error>(())
+                });
+
+                task.await?
             }
         });
 

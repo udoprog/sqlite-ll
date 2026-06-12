@@ -120,8 +120,12 @@
 //! "#)?;
 //!
 //! let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:name, :age)")?;
+//!
 //! stmt.execute(Person { name: "Alice", age: 30 })?;
+//! stmt.reset()?;
+//!
 //! stmt.execute(Person { name: "Bob", age: 40 })?;
+//! stmt.reset()?;
 //!
 //! let mut query = c.prepare("SELECT name, age FROM persons ORDER BY age")?;
 //!
@@ -130,6 +134,8 @@
 //!
 //! let p = query.next::<Person<'_>>()?;
 //! assert_eq!(p, Some(Person { name: "Bob", age: 40 }));
+//!
+//! query.reset()?;
 //! # Ok::<_, sqll::Error>(())
 //! ```
 //!
@@ -168,6 +174,8 @@
 //!     while let Some(row) = stmt.next::<(String, i64)>()? {
 //!         rows.push(row);
 //!     }
+//!
+//!     stmt.reset()?;
 //! }
 //!
 //! let expected = vec![
@@ -451,7 +459,9 @@ pub use self::version::{lib_version, lib_version_number};
 /// "#)?;
 ///
 /// let mut stmt = c.prepare("INSERT INTO persons (age, name) VALUES (?, ?)")?;
+///
 /// stmt.execute(Person { name: "Alice", age: 30 })?;
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 ///
@@ -493,7 +503,9 @@ pub use self::version::{lib_version, lib_version_number};
 ///
 /// let mut stmt = c.prepare("INSERT INTO persons (name, age) VALUES (:notname, :notage)")?;
 /// stmt.execute(Person { name: "Alice", age: 30 })?;
+/// stmt.reset()?;
 /// # stmt.execute(PersonStr { name: "Alice", age: 30 })?;
+/// # stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 #[cfg(feature = "derive")]

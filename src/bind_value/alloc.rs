@@ -25,13 +25,13 @@ use super::BindValue;
 ///
 /// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
-/// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, vec![b'H', b'e', b'l', b'l', b'o'])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
-///
 /// stmt.reset()?;
+///
 /// stmt.bind_value(Index::BIND, vec![])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl BindValue for Vec<u8> {
@@ -62,9 +62,11 @@ impl BindValue for Vec<u8> {
 ///
 /// stmt.bind(vec![b'H', b'e', b'l', b'l', b'o'])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
+/// stmt.reset()?;
 ///
 /// stmt.bind(vec![])?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for Vec<u8> {
@@ -152,13 +154,13 @@ impl Bind for String {
 ///
 /// let mut stmt = c.prepare("SELECT id FROM files WHERE data = ?")?;
 ///
-/// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Box::<[u8]>::from([b'H', b'e', b'l', b'l', b'o']))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
-///
 /// stmt.reset()?;
+///
 /// stmt.bind_value(Index::BIND, Box::<[u8]>::from([]))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 ///
@@ -177,9 +179,9 @@ impl Bind for String {
 ///
 /// let mut stmt = c.prepare("SELECT age FROM users WHERE name = ?")?;
 ///
-/// stmt.reset()?;
 /// stmt.bind_value(Index::BIND, Box::<str>::from("Alice"))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl<T> BindValue for Box<T>
@@ -215,9 +217,11 @@ where
 ///
 /// stmt.bind(Box::<[u8]>::from([b'H', b'e', b'l', b'l', b'o']))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(1)]);
+/// stmt.reset()?;
 ///
 /// stmt.bind(Box::<[u8]>::from([]))?;
 /// assert_eq!(stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(2)]);
+/// stmt.reset()?;
 /// # Ok::<_, sqll::Error>(())
 /// ```
 ///

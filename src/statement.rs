@@ -142,18 +142,18 @@ impl State {
 /// statement will remain alive for as long as the statement is alive, even if
 /// the connection is closed.
 ///
-/// Statements can be re-used, but between each re-use [`reset`] has to be
-/// called. A defensive coding style suggests its appropriate to always call
-/// this before using a statement. A call to [`reset`] must also be done to
-/// refresh the prepared statement with respects to changes in the database.
+/// Statements can be re-used, but after each use [`reset`] has to be called to
+/// ensure that the data it interacts with is persisted.
 ///
-/// A handful of higher-level convenience methods calls [`reset`] internally,
-/// such as [`bind`] and [`execute`] since it wouldn't make sense to use them
-/// without resetting first. Binding in the middle of stepping through the
-/// results has no effect.
+/// A handful of higher-level convenience methods calls [`reset`] internally
+/// when they have finished, such as [`execute`] and [`first`] since it wouldn't
+/// make sense to use them without resetting afterwards. Binding in the middle
+/// of stepping through the results has no effect.
 ///
 /// Low level APIs are the following:
-/// * [`reset`] - Resets the statement to be re-executed.
+/// * [`reset`] - Resets the statement allowing any pending operations to be
+///   flushed to the database. This should be called before read and write
+///   transactions, and must be called after write transactions.
 /// * [`step`] - Steps the statement over the query.
 /// * [`bind_value`] - Binds a single value to a specific index in a statement.
 /// * [`column`] - Reads a single column from the current row.
@@ -180,6 +180,7 @@ impl State {
 /// [`column`]: Self::column
 /// [`Connection`]: crate::Connection
 /// [`execute`]: Self::execute
+/// [`first`]: Self::first
 /// [`into_iter`]: Self::into_iter
 /// [`iter`]: Self::iter
 /// [`next`]: Self::next
@@ -420,7 +421,8 @@ impl Statement {
     /// using the [`Row` derive].
     ///
     /// Returns `None` when there are no more rows, at this point [`step`] is
-    /// guaranteed to have returned [`State::Done`].
+    /// guaranteed to have returned [`State::Done`]. It also resets the
+    /// statement when `None` is produced.
     ///
     /// This is a higher level API than `step` and is less prone to misuse.
     /// Misuse never leads to corrupted data or undefined behavior, only
@@ -491,6 +493,8 @@ impl Statement {
     ///     while let Some(person) = stmt.next::<Person>()? {
     ///         results.push((person.name, person.age));
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     ///
     /// let expected = [
@@ -511,62 +515,6 @@ impl Statement {
             State::Row => Ok(Some(T::from_row(self)?)),
             State::Done => Ok(None),
         }
-    }
-
-    /// Complete the current statement by calling `step` until it reports
-    /// [`State::Done`], then return the first row returned.
-    ///
-    /// Before calling this method, the statement should be reset either by
-    /// calling [`reset`] or [`bind`] if the statement takes arguments.
-    ///
-    /// This method cannot borrow from the current statement because it needs to
-    /// step until completion which invalidates any values borrowed from the
-    /// current statement.
-    ///
-    /// If you want to manipulate borrowed data you can use [`next`] and make
-    /// sure to continue calling it until it returns `None`.
-    ///
-    /// If you don't care about data being returned, use [`execute`] instead.
-    ///
-    /// [`bind`]: Self::bind
-    /// [`execute`]: Self::execute
-    /// [`next`]: Self::next
-    /// [`reset`]: Self::reset
-    ///
-    /// # Errors
-    ///
-    /// This method errors if the statement returns no rows.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use sqll::{Connection, Row};
-    ///
-    /// let c = Connection::open_in_memory()?;
-    ///
-    /// c.execute(r#"
-    ///    CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER);
-    /// "#)?;
-    ///
-    /// let mut stmt = c.prepare("INSERT INTO users (name, age) VALUES ('Alice', 72) RETURNING id")?;
-    /// stmt.reset()?;
-    ///
-    /// let id = stmt.first::<i64>()?;
-    /// assert_eq!(id, 1);
-    /// # Ok::<_, sqll::Error>(())
-    /// ```
-    #[inline]
-    pub fn first<T>(&mut self) -> Result<T>
-    where
-        T: for<'stmt> Row<'stmt>,
-    {
-        let Some(value) = self.next::<T>()? else {
-            return Err(Error::new(Code::DONE, "Expected at least one row of data"));
-        };
-
-        while !self.step()?.is_done() {}
-
-        Ok(value)
     }
 
     /// Step the statement.
@@ -644,6 +592,8 @@ impl Statement {
     ///     while let Some(row) = stmt.next::<(String, i64)>()? {
     ///         results.push(row);
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     ///
     /// let expected = [
@@ -693,8 +643,12 @@ impl Statement {
     /// "#)?;
     ///
     /// let mut stmt = c.prepare("UPDATE users SET age = age + 1")?;
+    ///
     /// stmt.execute(())?;
+    /// stmt.reset()?;
+    ///
     /// stmt.execute(())?;
+    /// stmt.reset()?;
     ///
     /// let mut query = c.prepare("SELECT age FROM users ORDER BY name")?;
     /// let results = query.iter::<i64>().collect::<Result<Vec<_>>>()?;
@@ -741,13 +695,15 @@ impl Statement {
     ///
     /// let mut stmt = c.prepare("SELECT * FROM users WHERE age > 40")?;
     ///
-    /// stmt.reset()?;
     /// let results = stmt.iter::<(String, i64)>().collect::<Result<Vec<_>>>()?;
+    /// stmt.reset()?;
+    ///
     /// let expected = [(String::from("Alice"), 72)];
     /// assert_eq!(results, expected);
     ///
-    /// stmt.reset()?;
     /// let results = stmt.iter::<Person>().collect::<Result<Vec<_>>>()?;
+    /// stmt.reset()?;
+    ///
     /// let expected = [Person { name: String::from("Alice"), age: 72 }];
     /// assert_eq!(results, expected);
     /// # Ok::<_, sqll::Error>(())
@@ -850,6 +806,8 @@ impl Statement {
     ///     while let Some(row) = stmt.next::<(String, i64)>()? {
     ///         results.push(row);
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     ///
     /// let expected = [
@@ -896,6 +854,8 @@ impl Statement {
     ///     while let Some(row) = stmt.next::<(String, i64)>()? {
     ///         results.push(row);
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     ///
     /// let expected = [
@@ -960,7 +920,6 @@ impl Statement {
     /// ```
     #[inline]
     pub fn bind(&mut self, value: impl Bind) -> Result<()> {
-        self.reset()?;
         value.bind(self)
     }
 
@@ -1425,6 +1384,8 @@ impl Statement {
     ///         let age = stmt.column::<i64>(1)?;
     ///         results.push((name, age));
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     ///
     /// let expected = [
@@ -1474,6 +1435,8 @@ impl Statement {
     ///         let name = stmt.unsized_column::<str>(0)?;
     ///         assert!(matches!(name, "Alice" | "Bob"));
     ///     }
+    ///
+    ///     stmt.reset()?;
     /// }
     /// # Ok::<_, sqll::Error>(())
     /// ```

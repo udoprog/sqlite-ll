@@ -457,6 +457,7 @@ impl Connection {
                 if let Some(raw) = NonNull::new(raw.assume_init()) {
                     let mut statement = Statement::from_raw(raw, self.is_thread_safe);
                     while statement.step()?.is_row() {}
+                    statement.reset()?;
                 }
 
                 // Skip over empty statements.
@@ -581,15 +582,17 @@ impl Connection {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare("INSERT INTO test (id) VALUES (?);")?;
-    /// let mut query_stmt = c.prepare("SELECT id FROM test;")?;
+    /// let mut insert = c.prepare("INSERT INTO test (id) VALUES (?);")?;
+    /// let mut query = c.prepare("SELECT id FROM test;")?;
     ///
     /// drop(c);
     ///
-    /// insert_stmt.execute(42)?;
+    /// insert.execute(42)?;
+    /// insert.reset()?;
     ///
-    /// query_stmt.bind(())?;
-    /// assert_eq!(query_stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
+    /// query.bind(())?;
+    /// assert_eq!(query.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
+    /// query.reset()?;
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
@@ -637,7 +640,7 @@ impl Connection {
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?)")
+    /// let mut insert = c.prepare_with("INSERT INTO test (id) VALUES (?)")
     ///     .persistent()
     ///     .build()?;
     ///
@@ -649,8 +652,8 @@ impl Connection {
     ///
     /// /* .. */
     ///
-    /// insert_stmt.bind(42)?;
-    /// assert!(insert_stmt.step()?.is_done());
+    /// insert.bind(42)?;
+    /// assert!(insert.step()?.is_done());
     ///
     /// query_stmt.bind(())?;
     /// assert_eq!(query_stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);
@@ -814,6 +817,8 @@ impl Connection {
     ///     assert_eq!(id?, 4);
     /// }
     ///
+    /// select.reset()?;
+    ///
     /// c.execute("DELETE FROM users WHERE id = 3")?;
     /// assert_eq!(c.last_insert_rowid(), 4);
     ///
@@ -825,6 +830,8 @@ impl Connection {
     /// while let Some(id) = select.next::<i64>()? {
     ///     assert_eq!(id, 5);
     /// }
+    ///
+    /// select.reset()?;
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
@@ -1298,7 +1305,7 @@ where
     ///     CREATE TABLE test (id INTEGER);
     /// "#)?;
     ///
-    /// let mut insert_stmt = c.prepare_with("INSERT INTO test (id) VALUES (?)")
+    /// let mut insert = c.prepare_with("INSERT INTO test (id) VALUES (?)")
     ///     .persistent()
     ///     .build()?;
     ///
@@ -1310,8 +1317,8 @@ where
     ///
     /// /* .. */
     ///
-    /// insert_stmt.bind(42)?;
-    /// assert!(insert_stmt.step()?.is_done());
+    /// insert.bind(42)?;
+    /// assert!(insert.step()?.is_done());
     ///
     /// query_stmt.bind(())?;
     /// assert_eq!(query_stmt.iter::<i64>().collect::<Vec<_>>(), [Ok(42)]);

@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stmt = c.prepare("INSERT INTO persons (name) VALUES (?), (?), (?)")?;
     stmt.execute(("Steven", "John", "Alex"))?;
+    stmt.reset()?;
 
     let mut stmt = c
         .prepare_with("SELECT id, name FROM persons")
