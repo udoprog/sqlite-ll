@@ -230,11 +230,15 @@ fn inner(cx: &Ctxt, input: TokenStream, what: What) -> Result<TokenStream, ()> {
                     }},
                 });
 
+            let count = fields.len();
+
             let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
             let expanded = quote! {
                 #[automatically_derived]
                 impl #impl_generics #bind_t for #ident #ty_generics #where_clause {
+                    const COUNT: usize = #count;
+
                     #[inline]
                     fn bind(&self, stmt: &mut #statement) -> #result<(), #error> {
                         #(#bindings)*
@@ -310,9 +314,13 @@ fn inner(cx: &Ctxt, input: TokenStream, what: What) -> Result<TokenStream, ()> {
             let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
             let (_, ty_generics, _) = input.generics.split_for_impl();
 
+            let count = fields.len();
+
             let expanded = quote! {
                 #[automatically_derived]
                 unsafe impl #impl_generics #row_t<#lt> for #ident #ty_generics #where_clause {
+                    const COUNT: usize = #count;
+
                     #[inline]
                     fn from_row(stmt: &#lt mut #statement) -> #result<Self, #error> {
                         #(#setup)*

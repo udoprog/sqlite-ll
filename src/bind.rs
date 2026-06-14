@@ -40,6 +40,9 @@ use crate::{BindValue, Error, Statement};
 /// # Ok::<_, sqll::Error>(())
 /// ```
 pub trait Bind {
+    /// The number of parameters that this binding binds.
+    const COUNT: usize;
+
     /// Bind this value into the given [`Statement`].
     fn bind(&self, stmt: &mut Statement) -> Result<(), Error>;
 }
@@ -78,6 +81,8 @@ impl<T> Bind for &T
 where
     T: ?Sized + Bind,
 {
+    const COUNT: usize = T::COUNT;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<(), Error> {
         (*self).bind(stmt)
@@ -104,6 +109,8 @@ where
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for () {
+    const COUNT: usize = 0;
+
     #[inline]
     fn bind(&self, _stmt: &mut Statement) -> Result<(), Error> {
         Ok(())
@@ -117,7 +124,7 @@ macro_rules! ty {
 }
 
 macro_rules! implement_tuple {
-    ($ty0:ident $var0:ident $v0:literal $v1:literal $(, $ty:ident $var:ident $v0n:literal $v1n:literal)* $(,)? ) => {
+    ($count:literal, $ty0:ident $var0:ident $v0:literal $v1:literal $(, $ty:ident $var:ident $v0n:literal $v1n:literal)* $(,)? ) => {
         /// [`Bind`] implementation for a tuple.
         ///
         /// A tuple binds elements one after another starting from the first index.
@@ -147,6 +154,8 @@ macro_rules! implement_tuple {
             $ty0: BindValue,
             $($ty: BindValue,)*
         {
+            const COUNT: usize = $count;
+
             #[inline]
             fn bind(&self, stmt: &mut Statement) -> Result<(), Error> {
                 let ($var0, $($var,)*) = self;

@@ -38,6 +38,8 @@ pub trait BindValue {
     /// }
     ///
     /// impl Bind for Id {
+    ///     const COUNT: usize = 1;
+    ///
     ///     #[inline]
     ///     fn bind(&self, stmt: &mut Statement) -> Result<()> {
     ///         self.bind_value(stmt, Index::BIND)
@@ -123,6 +125,8 @@ impl BindValue for Null {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for Null {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -187,6 +191,8 @@ impl BindValue for Value<'_> {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for Value<'_> {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -272,6 +278,8 @@ impl BindValue for [u8] {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for [u8] {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -342,6 +350,8 @@ impl<const N: usize> BindValue for FixedBlob<N> {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl<const N: usize> Bind for FixedBlob<N> {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -412,6 +422,8 @@ impl<const N: usize> BindValue for [u8; N] {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl<const N: usize> Bind for [u8; N] {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -492,6 +504,8 @@ impl BindValue for f64 {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for f64 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -566,6 +580,8 @@ impl BindValue for f32 {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for f32 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -646,6 +662,8 @@ impl BindValue for i64 {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for i64 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -726,6 +744,8 @@ impl BindValue for bool {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for bool {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -765,6 +785,8 @@ macro_rules! lossless {
         }
 
         impl Bind for $ty {
+            const COUNT: usize = 1;
+
             #[inline]
             fn bind(&self, stmt: &mut Statement) -> Result<()> {
                 self.bind_value(stmt, Index::BIND)
@@ -876,6 +898,8 @@ macro_rules! lossy {
         /// # Ok::<_, sqll::Error>(())
         /// ```
         impl Bind for $ty {
+            const COUNT: usize = 1;
+
             #[inline]
             fn bind(&self, stmt: &mut Statement) -> Result<()> {
                 self.bind_value(stmt, Index::BIND)
@@ -985,6 +1009,8 @@ impl BindValue for str {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for str {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -1074,6 +1100,8 @@ impl BindValue for Text {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for Text {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -1130,6 +1158,8 @@ impl<const N: usize> BindValue for FixedText<N> {
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 impl<const N: usize> Bind for FixedText<N> {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -1269,6 +1299,8 @@ impl<T> Bind for Option<T>
 where
     T: BindValue,
 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)

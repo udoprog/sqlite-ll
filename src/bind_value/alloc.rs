@@ -70,6 +70,8 @@ impl BindValue for Vec<u8> {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for Vec<u8> {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -127,6 +129,8 @@ impl BindValue for String {
 /// # Ok::<_, sqll::Error>(())
 /// ```
 impl Bind for String {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)
@@ -248,6 +252,8 @@ impl<T> Bind for Box<T>
 where
     T: ?Sized + BindValue,
 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn bind(&self, stmt: &mut Statement) -> Result<()> {
         self.bind_value(stmt, Index::BIND)

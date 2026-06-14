@@ -121,6 +121,9 @@ pub unsafe trait Row<'stmt>
 where
     Self: Sized,
 {
+    /// The number of columns that this row reads.
+    const COUNT: usize;
+
     /// Constructs an instance of `Self` from the given row.
     fn from_row(stmt: &'stmt mut Statement) -> Result<Self, Error>;
 }
@@ -129,6 +132,8 @@ unsafe impl<'stmt, T> Row<'stmt> for T
 where
     T: FromColumn<'stmt>,
 {
+    const COUNT: usize = 1;
+
     #[inline]
     fn from_row(stmt: &'stmt mut Statement) -> Result<Self, Error> {
         let prepare = T::Type::check(stmt, Column::FIRST)?;
@@ -143,7 +148,7 @@ macro_rules! ignore {
 }
 
 macro_rules! implement_tuple {
-    ($ty0:ident $var0:ident $value0:literal $value1:literal $(, $ty:ident $var:ident $value0n:literal $value1n:literal)* $(,)? ) => {
+    ($count:literal, $ty0:ident $var0:ident $value0:literal $value1:literal $(, $ty:ident $var:ident $value0n:literal $value1n:literal)* $(,)? ) => {
         /// [`Row`] implementation for a tuple.
         ///
         /// A tuple reads elements one after another, starting at the first
@@ -175,6 +180,8 @@ macro_rules! implement_tuple {
             $ty0: FromColumn<'stmt>,
             $($ty: FromColumn<'stmt>,)*
         {
+            const COUNT: usize = $count;
+
             #[inline]
             fn from_row(stmt: &'stmt mut Statement) -> Result<Self, Error> {
                 let $var0 = <$ty0>::Type::check(stmt, $crate::Column::from($value0))?;
