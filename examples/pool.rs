@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use sqll::{OpenOptions, PoolBuilder, SendStatement, Statements};
+use sqll::{OpenOptions, PoolBuilder, Statements, TypedStatement};
 use tokio::task;
 
 /// Statements used for read-only access.
@@ -23,14 +23,14 @@ use tokio::task;
 #[sql(read_only)]
 struct Read {
     #[sql = "SELECT name, age FROM users ORDER BY age"]
-    all_users: SendStatement,
+    all_users: TypedStatement<(), (String, i64)>,
 }
 
 /// Statements used for exclusive write access.
 #[derive(Statements)]
 struct Write {
     #[sql = "INSERT INTO users (name, age) VALUES (?, ?)"]
-    insert_user: SendStatement,
+    insert_user: TypedStatement<(String, i64), ()>,
 }
 
 #[tokio::main]
@@ -69,7 +69,6 @@ async fn main() -> Result<()> {
 
             for (name, age) in [("Alice", 42), ("Bob", 52), ("Charlie", 20)] {
                 guard.insert_user.execute((name, age))?;
-                guard.insert_user.reset()?;
             }
 
             Ok(())
@@ -85,17 +84,17 @@ async fn main() -> Result<()> {
         let pool = pool.clone();
 
         tasks.push(task::spawn(async move {
-            let guard = pool.shared().await?;
+            let mut guard = pool.shared().await?;
 
             task::spawn_blocking(move || -> Result<Vec<(String, i64)>> {
-                let mut guard = guard;
                 let mut rows = Vec::new();
 
-                while let Some(row) = guard.all_users.next::<(String, i64)>()? {
+                let mut stmt = guard.all_users.query()?;
+
+                while let Some(row) = stmt.next()? {
                     rows.push(row);
                 }
 
-                guard.all_users.reset()?;
                 Ok(rows)
             })
             .await?

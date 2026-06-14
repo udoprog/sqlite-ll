@@ -41,6 +41,7 @@ jobs:
           - alloc,bundled
           - alloc,threadsafe,bundled
           - pool,threadsafe,bundled
+          - typed,bundled
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable

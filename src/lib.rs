@@ -313,18 +313,25 @@ mod row;
 mod statement;
 mod text;
 pub mod ty;
+#[cfg(feature = "typed")]
+pub mod typed;
 mod utils;
 mod value;
 mod value_type;
 mod version;
 
 #[cfg(feature = "pool")]
-#[cfg_attr(docsrs, cfg(feature = "pool"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "pool")))]
 #[doc(inline)]
 pub use self::pool::{
     ConnectionSetup, EmptySetup, ExclusiveGuard, IsReadOnly, Pool, PoolBuilder, PoolError,
     SharedGuard, Statements,
 };
+
+#[cfg(feature = "typed")]
+#[cfg_attr(docsrs, doc(cfg(feature = "typed")))]
+#[doc(inline)]
+pub use self::typed::{BoundStatement, TryFromSendStatementError, TypedStatement};
 
 #[doc(inline)]
 pub use self::bind::Bind;
