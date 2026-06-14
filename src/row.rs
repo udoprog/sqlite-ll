@@ -147,6 +147,35 @@ macro_rules! ignore {
     };
 }
 
+/// [`Row`] implementation for the unit type.
+///
+/// This is useful for queries that do not return any columns, such as `INSERT`
+/// or `UPDATE`.
+///
+/// # Examples
+/// ```
+/// use sqll::{Connection, Row};
+///
+/// let mut c = Connection::open_in_memory()?;
+///
+/// c.execute(r#"
+///     CREATE TABLE users (name TEXT, age INTEGER);
+/// "#)?;
+///
+/// let mut stmt = c.prepare("INSERT INTO users VALUES ('Alice', 42)")?;
+///
+/// assert_eq!(stmt.next::<()>()?, None);
+/// # Ok::<_, sqll::Error>(())
+/// ```
+unsafe impl Row<'_> for () {
+    const COUNT: usize = 0;
+
+    #[inline]
+    fn from_row(_stmt: &mut Statement) -> Result<Self, Error> {
+        Ok(())
+    }
+}
+
 macro_rules! implement_tuple {
     ($count:literal, $ty0:ident $var0:ident $value0:literal $value1:literal $(, $ty:ident $var:ident $value0n:literal $value1n:literal)* $(,)? ) => {
         /// [`Row`] implementation for a tuple.

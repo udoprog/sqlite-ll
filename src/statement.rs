@@ -1073,6 +1073,9 @@ impl Statement {
     /// // In order to see the new column, we have to prepare a new statement.
     /// let select_stmt = c.prepare("SELECT * FROM users")?;
     /// assert_eq!(select_stmt.column_count(), 3);
+    ///
+    /// let mut insert_stmt = c.prepare("INSERT INTO users VALUES ('Alice', 42, 'Engineer')")?;
+    /// assert_eq!(insert_stmt.column_count(), 0);
     /// # Ok::<_, sqll::Error>(())
     /// ```
     #[inline]
