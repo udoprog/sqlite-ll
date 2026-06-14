@@ -1,6 +1,6 @@
 [package]
 name = "sqll-sys"
-version = "0.13.4+sqlite3.53.2"
+version = "0.14.0+sqlite3.53.2"
 authors = [
     "John-John Tedro <udoprog@tedro.se>",
 ]
