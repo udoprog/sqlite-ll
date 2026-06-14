@@ -67,7 +67,7 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
     let send_statement = quote!(::sqll::SendStatement);
     let is_read_only_t = quote!(::sqll::IsReadOnly);
     let statements_t = quote!(::sqll::Statements);
-    let from = quote!(::core::convert::From);
+    let try_from_t = quote!(::core::convert::TryFrom);
 
     let mut read_only = false;
 
@@ -176,6 +176,7 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
         let member;
         let prepare_failed;
         let not_thread_safe;
+        let build_failed;
 
         match f.ident {
             Some(ref name) => {
@@ -183,12 +184,14 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
                 read_only_method = Ident::new("field_not_read_only", Span::call_site());
                 prepare_failed = Ident::new("field_prepare_failed", Span::call_site());
                 not_thread_safe = Ident::new("field_not_thread_safe", Span::call_site());
+                build_failed = Ident::new("field_build_failed", Span::call_site());
                 member = quote!(#message);
             }
             None => {
                 read_only_method = Ident::new("index_not_read_only", Span::call_site());
                 prepare_failed = Ident::new("index_prepare_failed", Span::call_site());
                 not_thread_safe = Ident::new("index_not_thread_safe", Span::call_site());
+                build_failed = Ident::new("index_build_failed", Span::call_site());
                 member = quote!(#index);
             }
         };
@@ -249,7 +252,12 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
 
                 #read_only_check
 
-                <#ty as #from<#send_statement>>::from(stmt)
+                match <#ty as #try_from_t<#send_statement>>::try_from(stmt) {
+                    Ok(stmt) => stmt,
+                    Err(error) => {
+                        return Err(#pool_error::#build_failed(#member, error));
+                    }
+                }
             }});
         }
     }

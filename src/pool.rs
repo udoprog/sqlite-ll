@@ -1,4 +1,5 @@
 use core::cell::UnsafeCell;
+use core::error::Error;
 use core::ffi::CStr;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -6,7 +7,7 @@ use core::ptr::NonNull;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use alloc::boxed::Box;
-#[cfg(all(feature = "alloc", feature = "std"))]
+#[cfg(feature = "std")]
 use alloc::ffi::CString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -16,17 +17,17 @@ use std::path::Path;
 
 use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
 
-use crate::{Connection, Error, NotThreadSafe, OpenOptions};
+use crate::{Connection, Error as SqllError, NotThreadSafe, OpenOptions};
 
 mod sealed_connection_setup {
-    use crate::Connection;
+    use crate::{Connection, Error};
 
     use super::EmptySetup;
 
     pub trait Sealed {}
 
     impl Sealed for EmptySetup {}
-    impl<F> Sealed for F where F: Fn(&mut Connection) -> Result<(), crate::Error> {}
+    impl<F> Sealed for F where F: Fn(&mut Connection) -> Result<(), Error> {}
 }
 
 /// The trait governing how a [`Connection`] is set up before its statements are
@@ -42,7 +43,7 @@ where
     Self: self::sealed_connection_setup::Sealed,
 {
     /// Run the setup against the given connection.
-    fn setup(&self, c: &mut Connection) -> Result<(), Error>;
+    fn setup(&self, c: &mut Connection) -> Result<(), SqllError>;
 }
 
 /// An empty connection setup that does nothing.
@@ -50,17 +51,17 @@ where
 pub struct EmptySetup;
 
 impl ConnectionSetup for EmptySetup {
-    fn setup(&self, _c: &mut Connection) -> Result<(), Error> {
+    fn setup(&self, _c: &mut Connection) -> Result<(), SqllError> {
         Ok(())
     }
 }
 
 impl<F> ConnectionSetup for F
 where
-    F: Fn(&mut Connection) -> Result<(), Error>,
+    F: Fn(&mut Connection) -> Result<(), SqllError>,
 {
     #[inline]
-    fn setup(&self, c: &mut Connection) -> Result<(), Error> {
+    fn setup(&self, c: &mut Connection) -> Result<(), SqllError> {
         self(c)
     }
 }
@@ -109,7 +110,7 @@ where
     /// [`open`]: PoolBuilder::open
     pub fn with_write_setup<T>(self, write_builder: T) -> PoolBuilder<RB, T>
     where
-        T: Fn(&mut Connection) -> Result<(), Error>,
+        T: Fn(&mut Connection) -> Result<(), SqllError>,
     {
         PoolBuilder {
             open_options: self.open_options,
@@ -132,7 +133,7 @@ where
     /// [`open`]: PoolBuilder::open
     pub fn with_read_setup<T>(self, read_builder: T) -> PoolBuilder<T, WB>
     where
-        T: Fn(&mut Connection) -> Result<(), Error>,
+        T: Fn(&mut Connection) -> Result<(), SqllError>,
     {
         PoolBuilder {
             open_options: self.open_options,
@@ -259,13 +260,13 @@ impl PoolError {
     }
     #[inline]
     #[doc(hidden)]
-    pub fn index_prepare_failed(index: usize, source: Error) -> Self {
+    pub fn index_prepare_failed(index: usize, source: SqllError) -> Self {
         Self::from(ErrorKind::IndexPrepareFailed(index, source))
     }
 
     #[inline]
     #[doc(hidden)]
-    pub fn field_prepare_failed(name: &'static str, source: Error) -> Self {
+    pub fn field_prepare_failed(name: &'static str, source: SqllError) -> Self {
         Self::from(ErrorKind::FieldPrepareFailed(name, source))
     }
 
@@ -279,6 +280,21 @@ impl PoolError {
     #[doc(hidden)]
     pub fn field_not_thread_safe(name: &'static str, source: NotThreadSafe) -> Self {
         Self::from(ErrorKind::FieldNotThreadSafe(name, source))
+    }
+
+    #[inline]
+    #[doc(hidden)]
+    pub fn index_build_failed(index: usize, source: impl Error + Send + Sync + 'static) -> Self {
+        Self::from(ErrorKind::IndexBuildFailed(index, Box::new(source)))
+    }
+
+    #[inline]
+    #[doc(hidden)]
+    pub fn field_build_failed(
+        name: &'static str,
+        source: impl Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::from(ErrorKind::FieldBuildFailed(name, Box::new(source)))
     }
 }
 
@@ -296,8 +312,8 @@ impl fmt::Debug for PoolError {
     }
 }
 
-impl core::error::Error for PoolError {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+impl Error for PoolError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self.kind {
             ErrorKind::BuildWriteConnection(ref source) => Some(source),
             ErrorKind::BuildReadConnection(_, ref source) => Some(source),
@@ -318,19 +334,21 @@ enum ErrorKind {
     NotUtf8Path,
     #[cfg(feature = "std")]
     NulByteInPath,
-    BuildWriteConnection(Error),
-    BuildReadConnection(usize, Error),
-    SetupWriteConnection(Error),
-    SetupReadConnection(usize, Error),
+    BuildWriteConnection(SqllError),
+    BuildReadConnection(usize, SqllError),
+    SetupWriteConnection(SqllError),
+    SetupReadConnection(usize, SqllError),
     NoConnections,
     ZeroConcurrency,
     TooManyConnections(usize),
     IndexNotReadOnly(usize),
     FieldNotReadOnly(&'static str),
-    IndexPrepareFailed(usize, Error),
-    FieldPrepareFailed(&'static str, Error),
+    IndexPrepareFailed(usize, SqllError),
+    FieldPrepareFailed(&'static str, SqllError),
     IndexNotThreadSafe(usize, NotThreadSafe),
     FieldNotThreadSafe(&'static str, NotThreadSafe),
+    IndexBuildFailed(usize, Box<dyn Error + Send + Sync + 'static>),
+    FieldBuildFailed(&'static str, Box<dyn Error + Send + Sync + 'static>),
 }
 
 impl From<ErrorKind> for PoolError {
@@ -365,6 +383,12 @@ impl fmt::Display for ErrorKind {
             Self::FieldPrepareFailed(name, _) => write!(f, "field {name} prepare failed"),
             Self::IndexNotThreadSafe(index, _) => write!(f, "index {index} is not thread-safe"),
             Self::FieldNotThreadSafe(name, _) => write!(f, "field {name} is not thread-safe"),
+            Self::IndexBuildFailed(index, source) => {
+                write!(f, "index {index} build failed: {source}")
+            }
+            Self::FieldBuildFailed(name, source) => {
+                write!(f, "field {name} build failed: {source}")
+            }
         }
     }
 }
