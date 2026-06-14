@@ -62,6 +62,7 @@ pub(super) fn expand(input: TokenStream) -> TokenStream {
 fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
     let st: ItemStruct = cx.capture(syn::parse2(input))?;
 
+    let connection = quote!(::sqll::Connection);
     let pool_error = quote!(::sqll::PoolError);
     let send_statement = quote!(::sqll::SendStatement);
     let is_read_only_t = quote!(::sqll::IsReadOnly);
@@ -92,6 +93,7 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
         }
     }
 
+    let mut assert_read_only_impl = None;
     let mut members = Vec::new();
     let mut variables = Vec::new();
     let mut builders = Vec::new();
@@ -117,30 +119,57 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
         }
 
         let mut query = QueryString::default();
+        let mut statements = false;
 
         for a in &f.attrs {
             if !a.path().is_ident("sql") {
                 continue;
             }
 
-            let Ok(name_value) = cx.capture(a.meta.require_name_value()) else {
-                continue;
-            };
+            match &a.meta {
+                syn::Meta::Path(..) => {
+                    cx.error(Error::new_spanned(
+                        &a.meta,
+                        "unsupported attribute, expected `statements` or a string literal",
+                    ));
 
-            if let Expr::Lit(ExprLit {
-                lit: Lit::Str(lit), ..
-            }) = &name_value.value
-            {
-                query.append(lit);
-                continue;
+                    continue;
+                }
+                syn::Meta::List(list) => {
+                    let result = list.parse_nested_meta(|s: ParseNestedMeta<'_>| {
+                        if s.path.is_ident("statements") {
+                            statements = true;
+                            return Ok(());
+                        }
+
+                        Err(Error::new_spanned(
+                            &s.path,
+                            "unsupported attribute, expected `statements` or a string literal",
+                        ))
+                    });
+
+                    if let Err(error) = result {
+                        cx.error(error);
+                    }
+
+                    continue;
+                }
+                syn::Meta::NameValue(name_value) => {
+                    if let Expr::Lit(ExprLit {
+                        lit: Lit::Str(lit), ..
+                    }) = &name_value.value
+                    {
+                        query.append(lit);
+                        continue;
+                    }
+
+                    cx.error(Error::new_spanned(name_value, "expected string literal"));
+                }
             }
-
-            cx.error(Error::new_spanned(name_value, "expected string literal"));
         }
 
         members.push(member);
 
-        let query = query.output;
         let ty = &f.ty;
 
         let read_only_method;
@@ -164,7 +193,7 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
             }
         };
 
-        let read_only = read_only.then(|| {
+        let read_only_check = read_only.then(|| {
             quote! {
                 if !stmt.is_read_only() {
                     return Err(#pool_error::#read_only_method(#member));
@@ -172,38 +201,74 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
             }
         });
 
-        builders.push(quote! {{
-            let stmt = match c.prepare_with(#query).persistent().build() {
-                Ok(stmt) => stmt,
-                Err(error) => {
-                    return Err(#pool_error::#prepare_failed(#member, error));
+        if statements {
+            if let Some(span) = query.span {
+                cx.error(Error::new(
+                    span,
+                    "cannot have both `statements` and a query string",
+                ));
+            }
+
+            // A `read_only` collection can only embed other read-only
+            // collections, otherwise its `IsReadOnly` implementation would be
+            // unsound since the per-statement checks below are bypassed for
+            // nested statements.
+            let assert_read_only = read_only.then(|| {
+                quote! {
+                    let _ = _assert_is_read_only::<#ty>;
                 }
-            };
+            });
 
-            let stmt = match unsafe { stmt.into_send() } {
-                Ok(stmt) => stmt,
-                Err(error) => {
-                    return Err(#pool_error::#not_thread_safe(#member, error));
-                }
-            };
+            if assert_read_only_impl.is_none() {
+                assert_read_only_impl = Some(quote! {
+                    fn _assert_is_read_only<T: #is_read_only_t>() {}
+                });
+            }
 
-            #read_only
+            builders.push(quote! {{
+                #assert_read_only
+                <#ty as #statements_t>::build(c)?
+            }});
+        } else {
+            let query = query.output;
 
-            <#ty as #from<#send_statement>>::from(stmt)
-        }});
+            builders.push(quote! {{
+                let stmt = match c.prepare_with(#query).persistent().build() {
+                    Ok(stmt) => stmt,
+                    Err(error) => {
+                        return Err(#pool_error::#prepare_failed(#member, error));
+                    }
+                };
+
+                let stmt = match unsafe { stmt.into_send() } {
+                    Ok(stmt) => stmt,
+                    Err(error) => {
+                        return Err(#pool_error::#not_thread_safe(#member, error));
+                    }
+                };
+
+                #read_only_check
+
+                <#ty as #from<#send_statement>>::from(stmt)
+            }});
+        }
     }
 
     let ident = &st.ident;
 
     let impl_read_only = read_only.then(|| {
         quote! {
+            #[automatically_derived]
             unsafe impl #is_read_only_t for #ident {}
         }
     });
 
     Ok(quote! {
+        #[automatically_derived]
         impl #statements_t for #ident {
-            fn build(c: ::sqll::Connection) -> Result<Self, #pool_error> {
+            fn build(c: &mut #connection) -> Result<Self, #pool_error> {
+                #assert_read_only_impl
+
                 #(let #variables = #builders;)*
 
                 Ok(Self {
@@ -219,10 +284,13 @@ fn inner(cx: &Ctxt, input: TokenStream) -> Result<TokenStream, ()> {
 #[derive(Default)]
 struct QueryString {
     output: String,
+    span: Option<Span>,
 }
 
 impl QueryString {
     fn append(&mut self, s: &LitStr) {
+        self.span = Some(s.span());
+
         let s = s.value();
         let s = s.trim();
 

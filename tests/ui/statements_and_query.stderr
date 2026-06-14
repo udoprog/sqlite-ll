@@ -1,0 +1,5 @@
+error: cannot have both `statements` and a query string
+  --> tests/ui/statements_and_query.rs:13:13
+   |
+13 |     #[sql = "SELECT 1"]
+   |             ^^^^^^^^^^

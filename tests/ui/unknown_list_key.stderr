@@ -1,0 +1,5 @@
+error: unsupported attribute, expected `statements` or a string literal
+ --> tests/ui/unknown_list_key.rs:5:11
+  |
+5 |     #[sql(nope)]
+  |           ^^^^

@@ -18,6 +18,181 @@ use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
 
 use crate::{Connection, Error, NotThreadSafe, OpenOptions};
 
+mod sealed_connection_setup {
+    use crate::Connection;
+
+    use super::EmptySetup;
+
+    pub trait Sealed {}
+
+    impl Sealed for EmptySetup {}
+    impl<F> Sealed for F where F: Fn(&mut Connection) -> Result<(), crate::Error> {}
+}
+
+/// The trait governing how a [`Connection`] is set up before its statements are
+/// prepared.
+///
+/// This is used by [`PoolBuilder::with_write_setup`] and
+/// [`PoolBuilder::with_read_setup`] to run setup logic (such as `PRAGMA`s or
+/// creating tables) on a connection before the corresponding [`Statements`] are
+/// prepared on it. It is implemented for any `Fn(&mut Connection) -> Result<(),
+/// Error>`, and the trait is sealed so it cannot be implemented for other types.
+pub trait ConnectionSetup
+where
+    Self: self::sealed_connection_setup::Sealed,
+{
+    /// Run the setup against the given connection.
+    fn setup(&self, c: &mut Connection) -> Result<(), Error>;
+}
+
+/// An empty connection setup that does nothing.
+#[non_exhaustive]
+pub struct EmptySetup;
+
+impl ConnectionSetup for EmptySetup {
+    fn setup(&self, _c: &mut Connection) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<F> ConnectionSetup for F
+where
+    F: Fn(&mut Connection) -> Result<(), Error>,
+{
+    #[inline]
+    fn setup(&self, c: &mut Connection) -> Result<(), Error> {
+        self(c)
+    }
+}
+
+/// Builder for a [`Pool`]. The pool needs to know how to prepare the statements
+/// for the read and write connections, and this builder provides the necessary
+/// information. The pool will prepare the statements on each connection up
+/// front, so the schema of the database must be compatible with the statements
+/// in the builder at the time the pool is constructed.
+pub struct PoolBuilder<RB, WB> {
+    open_options: OpenOptions,
+    read_concurrency: usize,
+    write_builder: WB,
+    read_builder: RB,
+}
+
+impl PoolBuilder<EmptySetup, EmptySetup> {
+    /// Construct a builder for the pool.
+    ///
+    /// See [`PoolBuilder::open`] for more details and examples.
+    pub fn new(open_options: OpenOptions, read_concurrency: usize) -> Self {
+        Self {
+            open_options,
+            read_concurrency,
+            write_builder: EmptySetup,
+            read_builder: EmptySetup,
+        }
+    }
+}
+
+impl<RB, WB> PoolBuilder<RB, WB>
+where
+    RB: ConnectionSetup,
+    WB: ConnectionSetup,
+{
+    /// Set the connection setup for the write connection.
+    ///
+    /// This is called exactly once on the single `read_write` connection,
+    /// before its statements are prepared and before any of the read
+    /// connections are opened. It is the right place to create or migrate the
+    /// schema that the read and write statements depend on.
+    ///
+    /// If the closure returns an error, [`open`] fails with a [`PoolError`]
+    /// whose source is the returned error.
+    ///
+    /// [`open`]: PoolBuilder::open
+    pub fn with_write_setup<T>(self, write_builder: T) -> PoolBuilder<RB, T>
+    where
+        T: Fn(&mut Connection) -> Result<(), Error>,
+    {
+        PoolBuilder {
+            open_options: self.open_options,
+            read_concurrency: self.read_concurrency,
+            read_builder: self.read_builder,
+            write_builder,
+        }
+    }
+
+    /// Set the connection setup for the read connections.
+    ///
+    /// This is called once on each of the `read_concurrency` read-only
+    /// connections, after the write connection has been set up, and before the
+    /// read statements are prepared on that connection. Since read connections
+    /// are opened `read_only`, this should not attempt to modify the database.
+    ///
+    /// If the closure returns an error, [`open`] fails with a [`PoolError`]
+    /// whose source is the returned error.
+    ///
+    /// [`open`]: PoolBuilder::open
+    pub fn with_read_setup<T>(self, read_builder: T) -> PoolBuilder<T, WB>
+    where
+        T: Fn(&mut Connection) -> Result<(), Error>,
+    {
+        PoolBuilder {
+            open_options: self.open_options,
+            read_concurrency: self.read_concurrency,
+            read_builder,
+            write_builder: self.write_builder,
+        }
+    }
+
+    /// Build the pool with the specified path.
+    ///
+    /// See [`Pool::new`] for more details and examples.
+    ///
+    /// [`Pool::new`]: Pool::new
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn open<R, W>(self, path: impl AsRef<Path>) -> Result<Pool<R, W>, PoolError>
+    where
+        R: IsReadOnly,
+        W: Statements,
+    {
+        let path = path.as_ref();
+
+        let Some(bytes) = path.to_str() else {
+            return Err(PoolError::from(ErrorKind::NotUtf8Path));
+        };
+
+        let Ok(string) = CString::new(bytes) else {
+            return Err(PoolError::from(ErrorKind::NulByteInPath));
+        };
+
+        Pool::new_c_str(
+            self.open_options,
+            &string,
+            self.read_concurrency,
+            self.write_builder,
+            self.read_builder,
+        )
+    }
+
+    /// Build the pool with the specified path as a C string.
+    ///
+    /// See [`Pool::new_c_str`] for more details and examples.
+    ///
+    /// [`Pool::new_c_str`]: Pool::new_c_str
+    pub fn open_c_str<R, W>(self, path: &CStr) -> Result<Pool<R, W>, PoolError>
+    where
+        R: IsReadOnly,
+        W: Statements,
+    {
+        Pool::new_c_str(
+            self.open_options,
+            path,
+            self.read_concurrency,
+            self.write_builder,
+            self.read_builder,
+        )
+    }
+}
+
 /// A collection of prepared statements that can be built from a [`Connection`].
 ///
 /// This is what the read (`R`) and write (`W`) sides of a [`Pool`] are made of.
@@ -35,7 +210,7 @@ where
     Self: Sized,
 {
     #[doc(hidden)]
-    fn build(c: Connection) -> Result<Self, PoolError>;
+    fn build(c: &mut Connection) -> Result<Self, PoolError>;
 }
 
 /// A marker trait for [`Statements`] that only ever read from the database.
@@ -126,6 +301,8 @@ impl core::error::Error for PoolError {
         match self.kind {
             ErrorKind::BuildWriteConnection(ref source) => Some(source),
             ErrorKind::BuildReadConnection(_, ref source) => Some(source),
+            ErrorKind::SetupWriteConnection(ref source) => Some(source),
+            ErrorKind::SetupReadConnection(_, ref source) => Some(source),
             ErrorKind::IndexPrepareFailed(_, ref source) => Some(source),
             ErrorKind::FieldPrepareFailed(_, ref source) => Some(source),
             ErrorKind::IndexNotThreadSafe(_, ref source) => Some(source),
@@ -143,6 +320,8 @@ enum ErrorKind {
     NulByteInPath,
     BuildWriteConnection(Error),
     BuildReadConnection(usize, Error),
+    SetupWriteConnection(Error),
+    SetupReadConnection(usize, Error),
     NoConnections,
     ZeroConcurrency,
     TooManyConnections(usize),
@@ -170,6 +349,8 @@ impl fmt::Display for ErrorKind {
             Self::NulByteInPath => write!(f, "path contains a nul byte"),
             Self::BuildWriteConnection(_) => write!(f, "building write connection"),
             Self::BuildReadConnection(index, _) => write!(f, "building read connection #{index}"),
+            Self::SetupWriteConnection(_) => write!(f, "setting up write connection"),
+            Self::SetupReadConnection(index, _) => write!(f, "setting up read connection #{index}"),
             Self::NoConnections => write!(f, "no connections available"),
             Self::ZeroConcurrency => write!(f, "read concurrency must be at least 1"),
             Self::TooManyConnections(concurrency) => {
@@ -210,7 +391,7 @@ impl fmt::Display for ErrorKind {
 /// the statements that mutate the database:
 ///
 /// ```no_run
-/// use sqll::{SendStatement, Statements, Pool, OpenOptions};
+/// use sqll::{SendStatement, Statements, PoolBuilder, OpenOptions};
 ///
 /// #[derive(Statements)]
 /// #[sql(read_only)]
@@ -227,7 +408,7 @@ impl fmt::Display for ErrorKind {
 ///
 /// let mut options = OpenOptions::new();
 /// options.no_mutex().create();
-/// let pool = Pool::<Read, Write>::new(options, "example.db", 4)?;
+/// let pool = PoolBuilder::new(options, 4).open::<Read, Write>("example.db")?;
 /// # Ok::<_, sqll::PoolError>(())
 /// ```
 ///
@@ -293,6 +474,13 @@ where
     /// table they reference must already exist in the database by the time the
     /// pool is constructed.
     ///
+    /// The `write_builder` and `read_builder` are [`ConnectionSetup`] hooks run
+    /// before the statements are prepared on the write and read connections
+    /// respectively. They can be used to create the schema the statements depend
+    /// on, or to apply per-connection `PRAGMA`s. Pass [`EmptySetup`] for either
+    /// to do nothing. Prefer [`PoolBuilder`], which constructs these for you and
+    /// defaults both to [`EmptySetup`].
+    ///
     /// # Errors
     ///
     /// `read_concurrency` must be in the range `1..=64` (the upper bound is a
@@ -312,6 +500,8 @@ where
         open_options: OpenOptions,
         path: impl AsRef<Path>,
         read_concurrency: usize,
+        write_builder: impl ConnectionSetup,
+        read_builder: impl ConnectionSetup,
     ) -> Result<Self, PoolError> {
         let path = path.as_ref();
 
@@ -323,7 +513,13 @@ where
             return Err(PoolError::from(ErrorKind::NulByteInPath));
         };
 
-        Self::_new_c_str(open_options, &string, read_concurrency)
+        Self::_new_c_str(
+            open_options,
+            &string,
+            read_concurrency,
+            write_builder,
+            read_builder,
+        )
     }
 
     /// Same as [`new`] but takes a C string for the path.
@@ -333,14 +529,24 @@ where
         open_options: OpenOptions,
         path: &CStr,
         read_concurrency: usize,
+        write_builder: impl ConnectionSetup,
+        read_builder: impl ConnectionSetup,
     ) -> Result<Self, PoolError> {
-        Self::_new_c_str(open_options, path, read_concurrency)
+        Self::_new_c_str(
+            open_options,
+            path,
+            read_concurrency,
+            write_builder,
+            read_builder,
+        )
     }
 
     fn _new_c_str(
         open_options: OpenOptions,
         path: &CStr,
         concurrency: usize,
+        write_builder: impl ConnectionSetup,
+        read_builder: impl ConnectionSetup,
     ) -> Result<Self, PoolError> {
         if concurrency == 0 {
             return Err(PoolError::from(ErrorKind::ZeroConcurrency));
@@ -352,25 +558,33 @@ where
             return Err(PoolError::from(ErrorKind::TooManyConnections(concurrency)));
         }
 
-        let write = open_options
+        let mut write = open_options
             .clone()
             .read_write()
             .open_c_str(path)
             .map_err(ErrorKind::BuildWriteConnection)?;
 
-        let write = W::build(write)?;
+        write_builder
+            .setup(&mut write)
+            .map_err(ErrorKind::SetupWriteConnection)?;
+
+        let write = W::build(&mut write)?;
 
         let mut read_pool = Vec::with_capacity(concurrency);
 
         for index in 0..concurrency {
-            let read = open_options
+            let mut read = open_options
                 .clone()
                 .no_create()
                 .read_only()
                 .open_c_str(path)
                 .map_err(move |error| ErrorKind::BuildReadConnection(index, error))?;
 
-            let read = R::build(read)?;
+            read_builder
+                .setup(&mut read)
+                .map_err(move |error| ErrorKind::SetupReadConnection(index, error))?;
+
+            let read = R::build(&mut read)?;
             read_pool.push(UnsafeCell::new(read));
         }
 

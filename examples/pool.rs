@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use sqll::{OpenOptions, Pool, SendStatement, Statements};
+use sqll::{OpenOptions, PoolBuilder, SendStatement, Statements};
 use tokio::task;
 
 /// Statements used for read-only access.
@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
     let mut options = OpenOptions::new();
     options.no_mutex().create();
 
-    let pool = Arc::new(Pool::<Read, Write>::new(options, &path, 4)?);
+    let pool = Arc::new(PoolBuilder::new(options, 4).open::<Read, Write>(&path)?);
 
     // Insert a few rows under an exclusive lock. While this guard is held no
     // other task can acquire a shared or exclusive lock. The actual statement

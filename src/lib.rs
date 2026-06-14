@@ -321,7 +321,10 @@ mod version;
 #[cfg(feature = "pool")]
 #[cfg_attr(docsrs, cfg(feature = "pool"))]
 #[doc(inline)]
-pub use self::pool::{ExclusiveGuard, IsReadOnly, Pool, PoolError, SharedGuard, Statements};
+pub use self::pool::{
+    ConnectionSetup, EmptySetup, ExclusiveGuard, IsReadOnly, Pool, PoolBuilder, PoolError,
+    SharedGuard, Statements,
+};
 
 #[doc(inline)]
 pub use self::bind::Bind;
@@ -673,11 +676,19 @@ pub use sqll_macros::Row;
 ///   [`PoolError`] if any statement turns out to mutate the database, and
 ///   the type additionally implements [`IsReadOnly`] so that it can be used as
 ///   the read side `R` of a [`Pool`].
+/// * `#[sql(statements)]` (field) - the field is itself a nested [`Statements`]
+///   collection that is built recursively rather than prepared from a query
+///   string. This lets you compose larger collections out of smaller, reusable
+///   ones. The field type must implement [`Statements`], and a `statements`
+///   field cannot also carry a `#[sql = "..."]` query. If the containing struct
+///   is `#[sql(read_only)]`, the nested type must also implement [`IsReadOnly`]
+///   (i.e. be `#[sql(read_only)]` itself), otherwise the read-only guarantee
+///   would be unsound.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// use sqll::{SendStatement, Statements, Pool, OpenOptions};
+/// use sqll::{SendStatement, Statements, PoolBuilder, OpenOptions};
 ///
 /// // The read side only contains statements that do not mutate the database,
 /// // so it can be marked `read_only` and used concurrently.
@@ -696,10 +707,66 @@ pub use sqll_macros::Row;
 ///     insert_user: SendStatement,
 /// }
 ///
-/// let mut c = OpenOptions::new();
-/// c.no_mutex().create();
-/// let pool = sqll::Pool::<Read, Write>::new(c, "example.db", 4)?;
+/// let mut options = OpenOptions::new();
+/// options.no_mutex().create();
+/// let pool = PoolBuilder::new(options, 4).open::<Read, Write>("example.db")?;
 /// # Ok::<_, sqll::PoolError>(())
+/// ```
+///
+/// ## Nested statements
+///
+/// A field marked `#[sql(statements)]` is itself a [`Statements`] collection,
+/// letting you share a common set of queries across the read and write sides
+/// instead of repeating them. Here the write side reuses the read collection so
+/// it can both query and mutate through a single value:
+///
+/// ```no_run
+/// use sqll::{SendStatement, Statements, PoolBuilder, OpenOptions};
+///
+/// #[derive(Statements)]
+/// #[sql(read_only)]
+/// struct Read {
+///     #[sql = "SELECT name, age FROM users ORDER BY age"]
+///     all_users: SendStatement,
+/// }
+///
+/// #[derive(Statements)]
+/// struct Write {
+///     // Reuse every statement in `Read`, accessible as `write.read.all_users`.
+///     #[sql(statements)]
+///     read: Read,
+///     #[sql = "INSERT INTO users (name, age) VALUES (?, ?)"]
+///     insert_user: SendStatement,
+/// }
+///
+/// let mut options = OpenOptions::new();
+/// options.no_mutex().create();
+/// let pool = PoolBuilder::new(options, 4).open::<Read, Write>("example.db")?;
+/// # Ok::<_, sqll::PoolError>(())
+/// ```
+///
+/// A `read_only` collection may only nest other `read_only` collections, since
+/// embedding a mutating collection would make its [`IsReadOnly`] implementation
+/// unsound. The following therefore fails to compile:
+///
+/// ```compile_fail
+/// use sqll::{SendStatement, Statements};
+///
+/// #[derive(Statements)]
+/// struct Write {
+///     #[sql = "INSERT INTO users (name, age) VALUES (?, ?)"]
+///     insert_user: SendStatement,
+/// }
+///
+/// // error: the trait bound `Write: IsReadOnly` is not satisfied
+/// #[derive(Statements)]
+/// #[sql(read_only)]
+/// struct Read {
+///     #[sql(statements)]
+///     write: Write,
+///     #[sql = "SELECT name, age FROM users ORDER BY age"]
+///     all_users: SendStatement,
+/// }
 /// ```
 ///
 /// [persistent]: crate::PrepareWith::persistent
