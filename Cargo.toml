@@ -16,17 +16,19 @@ keywords = ["api-bindings", "database", "ffi", "sqlite"]
 categories = ["api-bindings", "database"]
 
 [features]
-default = ["std", "derive", "threadsafe"]
+default = ["std", "derive", "threadsafe", "pool"]
 std = ["alloc"]
 alloc = []
 derive = ["dep:sqll-macros"]
 bundled = ["sqll-sys/bundled"]
 threadsafe = ["sqll-sys/threadsafe"]
 strict = ["sqll-sys/strict"]
+pool = ["alloc", "tokio/sync", "sqll-macros/statements"]
 
 [dependencies]
 sqll-sys = { version = "0.13.4", path = "sqll-sys", default-features = false }
 sqll-macros = { version = "0.13.4", path = "sqll-macros", optional = true }
+tokio = { version = "1.48.0", default-features = false, optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.100"
@@ -34,6 +36,10 @@ criterion = "0.8.0"
 tempfile = "3.24.0"
 axum = "0.8.8"
 tokio = { version = "1.48.0", features = ["full"] }
+
+[[example]]
+name = "pool"
+required-features = ["pool"]
 
 [[bench]]
 name = "statement_benches"

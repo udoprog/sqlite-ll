@@ -12,6 +12,9 @@ license = "MIT OR Apache-2.0"
 keywords = ["api-bindings", "database", "ffi", "sqlite"]
 categories = ["api-bindings", "database"]
 
+[features]
+statements = ["syn/full"]
+
 [lib]
 proc-macro = true
 

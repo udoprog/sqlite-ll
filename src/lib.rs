@@ -33,6 +33,8 @@
 //!   synchronization for the best performance in a real-world scenario.
 //! * [`examples/tokio_async.rs`] - Using `sqll` in an asynchronous context with
 //!   `tokio`.
+//! * [`examples/pool.rs`] - Using the high-level [`Pool`] to share read-only
+//!   connections and serialize writes from asynchronous tasks.
 //!
 //! <br>
 //!
@@ -226,6 +228,10 @@
 //!   instead[^sqll-sys].
 //! * `strict` - Enable usage of sqlite with the strict compiler options
 //!   enabled[^sqll-sys].
+//! * `pool` - Enable the high-level connection [`Pool`] and the
+//!   [`Statements` derive] for declaring reusable collections of prepared
+//!   statements. This pulls in a dependency on the `sync` feature of [`tokio`].
+//!   Enabled by default.
 //!
 //! [^sqll-sys]: This is a forwarded sqll-sys option, see <https://docs.rs/sqll-sys>.
 //!
@@ -243,10 +249,14 @@
 //! [`Connection`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#thread-safety
 //! [`examples/axum.rs`]: https://github.com/udoprog/sqll/blob/main/examples/axum.rs
 //! [`examples/persons.rs`]: https://github.com/udoprog/sqll/blob/main/examples/persons.rs
+//! [`examples/pool.rs`]: https://github.com/udoprog/sqll/blob/main/examples/pool.rs
 //! [`examples/tokio_async.rs`]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
 //! [`execute`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.execute
 //! [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 //! [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
+//! [`Pool`]: https://docs.rs/sqll/latest/sqll/struct.Pool.html
+//! [`Statements` derive]: https://docs.rs/sqll/latest/sqll/derive.Statements.html
+//! [`tokio`]: https://docs.rs/tokio
 //! [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
 //! [`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
 //! [`PrepareWith::persistent`]: https://docs.rs/sqll/latest/sqll/struct.PrepareWith.html#method.persistent
@@ -297,6 +307,8 @@ mod open_options;
 mod owned;
 #[cfg(feature = "alloc")]
 mod owned_bytes;
+#[cfg(feature = "pool")]
+mod pool;
 mod row;
 mod statement;
 mod text;
@@ -305,6 +317,11 @@ mod utils;
 mod value;
 mod value_type;
 mod version;
+
+#[cfg(feature = "pool")]
+#[cfg_attr(docsrs, cfg(feature = "pool"))]
+#[doc(inline)]
+pub use self::pool::{ExclusiveGuard, IsReadOnly, Pool, PoolError, SharedGuard, Statements};
 
 #[doc(inline)]
 pub use self::bind::Bind;
@@ -634,3 +651,64 @@ pub use sqll_macros::Bind;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use sqll_macros::Row;
+
+/// Derive macro for the [`Statements`] trait.
+///
+/// This implements [`Statements`] for a struct whose fields are the prepared
+/// statements you want to re-use. Each statement is prepared as [persistent]
+/// and converted into a [`SendStatement`] when the collection is built from a
+/// [`Connection`], which makes it suitable for use with the high-level
+/// [`Pool`].
+///
+/// Both named structs and tuple structs are supported.
+///
+/// # Attributes
+///
+/// * `#[sql = "..."]` (field) - the SQL of the statement to prepare for this
+///   field. The attribute may be repeated on a single field, in which case the
+///   fragments are trimmed and joined with a single space. This is convenient
+///   for splitting a long query over multiple lines.
+/// * `#[sql(read_only)]` (container) - assert that every statement in the
+///   collection is read-only. Building the collection fails with a
+///   [`PoolError`] if any statement turns out to mutate the database, and
+///   the type additionally implements [`IsReadOnly`] so that it can be used as
+///   the read side `R` of a [`Pool`].
+///
+/// # Examples
+///
+/// ```no_run
+/// use sqll::{SendStatement, Statements, Pool, OpenOptions};
+///
+/// // The read side only contains statements that do not mutate the database,
+/// // so it can be marked `read_only` and used concurrently.
+/// #[derive(Statements)]
+/// #[sql(read_only)]
+/// struct Read {
+///     #[sql = "SELECT name, age"]
+///     #[sql = "FROM users"]
+///     #[sql = "ORDER BY age"]
+///     all_users: SendStatement,
+/// }
+///
+/// #[derive(Statements)]
+/// struct Write {
+///     #[sql = "INSERT INTO users (name, age) VALUES (?, ?)"]
+///     insert_user: SendStatement,
+/// }
+///
+/// let mut c = OpenOptions::new();
+/// c.no_mutex().create();
+/// let pool = sqll::Pool::<Read, Write>::new(c, "example.db", 4)?;
+/// # Ok::<_, sqll::PoolError>(())
+/// ```
+///
+/// [persistent]: crate::PrepareWith::persistent
+/// [`Connection`]: crate::Connection
+/// [`PoolError`]: crate::PoolError
+/// [`IsReadOnly`]: crate::IsReadOnly
+/// [`Pool`]: crate::Pool
+/// [`SendStatement`]: crate::SendStatement
+/// [`Statements`]: crate::Statements
+#[cfg(all(feature = "derive", feature = "pool"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "pool"))))]
+pub use sqll_macros::Statements;

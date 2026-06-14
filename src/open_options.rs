@@ -242,6 +242,15 @@ impl OpenOptions {
         self
     }
 
+    // Unset the create option if it is set.
+    //
+    // This is only used internally.
+    #[cfg(feature = "pool")]
+    pub(super) fn no_create(&mut self) -> &mut Self {
+        self.raw &= !ffi::SQLITE_OPEN_CREATE;
+        self
+    }
+
     /// The filename can be interpreted as a URI if this flag is set.
     ///
     /// # Examples

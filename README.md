@@ -36,6 +36,8 @@ You can find simple examples of this below.
   synchronization for the best performance in a real-world scenario.
 * [`examples/tokio_async.rs`] - Using `sqll` in an asynchronous context with
   `tokio`.
+* [`examples/pool.rs`] - Using the high-level [`Pool`] to share read-only
+  connections and serialize writes from asynchronous tasks.
 
 <br>
 
@@ -225,6 +227,10 @@ See the [`tokio_async` example] for a complete example.
   instead[^sqll-sys].
 * `strict` - Enable usage of sqlite with the strict compiler options
   enabled[^sqll-sys].
+* `pool` - Enable the high-level connection [`Pool`] and the
+  [`Statements` derive] for declaring reusable collections of prepared
+  statements. This pulls in a dependency on the `sync` feature of [`tokio`].
+  Enabled by default.
 
 [^sqll-sys]: This is a forwarded sqll-sys option, see <https://docs.rs/sqll-sys>.
 
@@ -242,10 +248,14 @@ have been copied under the MIT license.
 [`Connection`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#thread-safety
 [`examples/axum.rs`]: https://github.com/udoprog/sqll/blob/main/examples/axum.rs
 [`examples/persons.rs`]: https://github.com/udoprog/sqll/blob/main/examples/persons.rs
+[`examples/pool.rs`]: https://github.com/udoprog/sqll/blob/main/examples/pool.rs
 [`examples/tokio_async.rs`]: https://github.com/udoprog/sqll/blob/main/examples/tokio_async.rs
 [`execute`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.execute
 [`next`]: https://docs.rs/sqll/latest/sqll/struct.Statement.html#method.next
 [`OpenOptions::no_mutex`]: https://docs.rs/sqll/latest/sqll/struct.OpenOptions.html#method.no_mutex
+[`Pool`]: https://docs.rs/sqll/latest/sqll/struct.Pool.html
+[`Statements` derive]: https://docs.rs/sqll/latest/sqll/derive.Statements.html
+[`tokio`]: https://docs.rs/tokio
 [`prepare_with`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare_with
 [`prepare`]: https://docs.rs/sqll/latest/sqll/struct.Connection.html#method.prepare
 [`PrepareWith::persistent`]: https://docs.rs/sqll/latest/sqll/struct.PrepareWith.html#method.persistent

@@ -145,10 +145,7 @@ impl State {
 /// Statements can be re-used, but after each use [`reset`] has to be called to
 /// ensure that the data it interacts with is persisted.
 ///
-/// A handful of higher-level convenience methods calls [`reset`] internally
-/// when they have finished, such as [`execute`] and [`first`] since it wouldn't
-/// make sense to use them without resetting afterwards. Binding in the middle
-/// of stepping through the results has no effect.
+/// Binding in the middle of stepping through the results has no effect.
 ///
 /// Low level APIs are the following:
 /// * [`reset`] - Resets the statement allowing any pending operations to be
@@ -180,7 +177,6 @@ impl State {
 /// [`column`]: Self::column
 /// [`Connection`]: crate::Connection
 /// [`execute`]: Self::execute
-/// [`first`]: Self::first
 /// [`into_iter`]: Self::into_iter
 /// [`iter`]: Self::iter
 /// [`next`]: Self::next
