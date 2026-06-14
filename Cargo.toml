@@ -1,6 +1,6 @@
 [package]
 name = "sqll"
-version = "0.14.1"
+version = "0.14.2"
 authors = [
     "John-John Tedro <udoprog@tedro.se>"
 ]
@@ -26,8 +26,8 @@ strict = ["sqll-sys/strict"]
 pool = ["alloc", "tokio/sync", "sqll-macros/statements"]
 
 [dependencies]
-sqll-sys = { version = "0.14.1", path = "sqll-sys", default-features = false }
-sqll-macros = { version = "0.14.1", path = "sqll-macros", optional = true }
+sqll-sys = { version = "0.14.2", path = "sqll-sys", default-features = false }
+sqll-macros = { version = "0.14.2", path = "sqll-macros", optional = true }
 tokio = { version = "1.48.0", default-features = false, optional = true }
 
 [dev-dependencies]
