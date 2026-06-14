@@ -154,6 +154,9 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn sqlite3_bind_parameter_count(arg1: *mut sqlite3_stmt) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn sqlite3_bind_parameter_name(
         arg1: *mut sqlite3_stmt,
         arg2: ::core::ffi::c_int,

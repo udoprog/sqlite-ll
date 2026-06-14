@@ -1007,6 +1007,34 @@ impl Statement {
         }
     }
 
+    /// Return the number of parameters that can be bound to this statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sqll::Connection;
+    ///
+    /// let c = Connection::open_in_memory()?;
+    ///
+    /// c.execute(r#"
+    ///     CREATE TABLE users (name TEXT, age INTEGER);
+    /// "#)?;
+    ///
+    /// let stmt = c.prepare("SELECT * FROM users")?;
+    /// assert_eq!(stmt.bind_parameter_count(), 0);
+    ///
+    /// let stmt = c.prepare("SELECT * FROM users WHERE name = ?")?;
+    /// assert_eq!(stmt.bind_parameter_count(), 1);
+    ///
+    /// let stmt = c.prepare("INSERT INTO users (name, age) VALUES (?, ?)")?;
+    /// assert_eq!(stmt.bind_parameter_count(), 2);
+    /// # Ok::<_, sqll::Error>(())
+    /// ```
+    #[inline]
+    pub fn bind_parameter_count(&self) -> c_int {
+        unsafe { ffi::sqlite3_bind_parameter_count(self.raw.as_ptr()) }
+    }
+
     /// Return the number of columns in the result set returned by the
     /// [`Statement`]. If this routine returns 0, that means the [`Statement`]
     /// returns no data (for example an `UPDATE`).
